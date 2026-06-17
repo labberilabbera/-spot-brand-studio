@@ -5,15 +5,6 @@ const PORT = process.env.PORT || 3000
 app.use(express.json({ limit: '10mb' }))
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'poc.html')) })
 
-function parseJsonSafe(text) {
-  let s = text.replace(/```json/g,'').replace(/```/g,'').trim()
-  s = s.replace(/,(s*[}]])/g, '$1')
-  const start = s.indexOf('[')
-  const end = s.lastIndexOf(']')
-  if (start === -1 || end === -1 || end <= start) return null
-  try { return JSON.parse(s.slice(start, end+1)) } catch(e) { return null }
-}
-
 app.post('/api/generate', async (req, res) => {
   try {
     const { channels=['instagram'], brief='', style='standard' } = req.body
@@ -26,19 +17,15 @@ app.post('/api/generate', async (req, res) => {
     })
     const data = await r.json()
     if (data.error) throw new Error('Gemini API: ' + data.error.message)
-    // Logga alla parts
-    const parts = data.candidates?.[0]?.content?.parts || []
-    console.log('PARTS COUNT:', parts.length)
-    parts.forEach((p, i) => {
-      console.log('PART '+i+' keys:', Object.keys(p).join(','))
-      if (p.text) console.log('PART '+i+' text start:', p.text.slice(0,200))
-      if (p.inlineData) console.log('PART '+i+' inlineData mimeType:', p.inlineData.mimeType)
-    })
-    // Hitta text-delen
-    const textPart = parts.find(p => p.text)
-    if (!textPart) throw new Error('Ingen textdel i svaret, parts: ' + JSON.stringify(parts.map(p=>Object.keys(p))))
-    const proposals = parseJsonSafe(textPart.text)
-    if (!proposals) throw new Error('Parse fail: ' + textPart.text.slice(0,300))
+    // Plocka ut ENDAST text-stringen, ignorera thoughtSignature
+    const textOnly = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    // Rensa och parsa
+    let s = textOnly.replace(/```json/g,'').replace(/```/g,'').trim()
+    s = s.replace(/,(s*[}]])/g, '$1')
+    const start = s.indexOf('[')
+    const end = s.lastIndexOf(']')
+    if (start === -1 || end === -1) throw new Error('Ingen array i svaret: '+s.slice(0,200))
+    const proposals = JSON.parse(s.slice(start, end+1))
     res.json({ proposals })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
