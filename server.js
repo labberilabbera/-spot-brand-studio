@@ -23,11 +23,12 @@ app.post('/api/generate', async (req, res) => {
     s = s.replace(/,(s*[}]])/g, '$1')
     const start = s.indexOf('['); const end = s.lastIndexOf(']')
     if (start === -1 || end === -1) throw new Error('Ingen array: '+s.slice(0,100))
-    const proposals = JSON.parse(s.slice(start, end+1))
-    // Poc forvanter sig proposals per kanal: { instagram: [...], linkedin: [...] }
-    const result = {}
-    channelList.forEach(ch => { result[ch] = proposals })
-    res.json(result)
+    const flatProposals = JSON.parse(s.slice(start, end+1))
+    // S.proposals = data.proposals, sen renderProposals gor S.proposals[ch]
+    // Sa proposals maste vara ett objekt med kanalnamn som nycklar
+    const proposals = {}
+    channelList.forEach(ch => { proposals[ch] = flatProposals })
+    res.json({ proposals })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 app.post('/api/generate-image', async (req, res) => {
