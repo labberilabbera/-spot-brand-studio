@@ -2,20 +2,10 @@
   "name": "spot-brand-studio",
   "version": "1.0.0",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start -p ${PORT:-3000}"
+    "start": "node server.js"
   },
   "dependencies": {
-    "next": "14.2.35",
-    "react": "^18",
-    "react-dom": "^18",
+    "express": "^4.18.2",
     "pg": "^8.11.3"
-  },
-  "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/pg": "^8",
-    "typescript": "^5"
   }
 }
