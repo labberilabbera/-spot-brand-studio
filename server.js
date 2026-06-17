@@ -10,7 +10,7 @@ app.post('/api/generate', async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY saknas' })
     const prompt = 'Du ar copywriter for spot. creative studio. Ton: professionell men varm, kreativ. Brief: '+(brief||'Generellt om spot.')+'. Kanaler: '+channels.join(', ')+'. Generera 3 unika forslag. Svara ENDAST med en JSON-array utan markdown, inga backticks, inga kodblock: [{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."}]'
-    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent?key='+apiKey, {
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key='+apiKey, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ contents: [{parts: [{text: prompt}]}], generationConfig: {temperature: 0.9, maxOutputTokens: 2000} })
     })
