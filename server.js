@@ -10,11 +10,11 @@ app.post('/api/generate', async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY saknas' })
     const prompt = 'Du ar copywriter for spot. creative studio. Ton: professionell men varm, kreativ. Brief: '+(brief||'Generellt om spot.')+'. Kanaler: '+channels.join(', ')+'. Generera 3 unika forslag. Svara ENDAST med giltig JSON-array: [{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."}]'
-    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key='+apiKey, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ contents: [{parts: [{text: prompt}]}], generationConfig: {temperature: 0.9, maxOutputTokens: 2000} }) })
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key='+apiKey, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ contents: [{parts: [{text: prompt}]}], generationConfig: {temperature: 0.9, maxOutputTokens: 2000} }) })
     const data = await r.json()
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
     const match = text.match(/[[sS]*]/)
-    if (!match) throw new Error('Ingen JSON: '+text.slice(0,200))
+    if (!match) throw new Error('Ingen JSON: '+text.slice(0,300))
     res.json({ proposals: JSON.parse(match[0]) })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
