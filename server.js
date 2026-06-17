@@ -11,7 +11,7 @@ app.post('/api/generate', async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY saknas' })
     const channelList = Array.isArray(channels) ? channels : [channels]
-    const prompt = 'Du ar copywriter for spot. creative studio Halmstad. Ton: professionell, varm, kreativ. Brief: '+(brief||'Generellt om spot.')+'. Kanaler: '+channelList.join(', ')+'. Generera EXAKT 3 korta forslag. Varje forslag max 100 ord i content. Svara ENDAST med JSON-array: [{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."}]'
+    const prompt = 'Du ar copywriter for spot. creative studio Halmstad. Ton: professionell, varm, kreativ. Brief: '+(brief||'Generellt om spot.')+'. Kanaler: '+channelList.join(', ')+'. Generera EXAKT 3 korta forslag max 100 ord vardera. Svara ENDAST med JSON-array: [{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."}]'
     const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key='+apiKey, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ contents: [{parts: [{text: prompt}]}], generationConfig: {temperature: 0.9, maxOutputTokens: 8192} })
@@ -21,14 +21,13 @@ app.post('/api/generate', async (req, res) => {
     const textOnly = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
     let s = textOnly.replace(/```json/g,'').replace(/```/g,'').trim()
     s = s.replace(/,(s*[}]])/g, '$1')
-    const start = s.indexOf('[')
-    const end = s.lastIndexOf(']')
+    const start = s.indexOf('['); const end = s.lastIndexOf(']')
     if (start === -1 || end === -1) throw new Error('Ingen array: '+s.slice(0,100))
     const proposals = JSON.parse(s.slice(start, end+1))
-    // Returnera bade flat array och per-kanal objekt
-    const perChannel = {}
-    channelList.forEach(ch => { perChannel[ch] = proposals })
-    res.json({ proposals, perChannel })
+    // Poc forvanter sig proposals per kanal: { instagram: [...], linkedin: [...] }
+    const result = {}
+    channelList.forEach(ch => { result[ch] = proposals })
+    res.json(result)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 app.post('/api/generate-image', async (req, res) => {
