@@ -6,11 +6,8 @@ app.use(express.json({ limit: '10mb' }))
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'poc.html')) })
 
 function parseJsonSafe(text) {
-  // Rensa markdown
   let s = text.replace(/```json/g,'').replace(/```/g,'').trim()
-  // Ta bort trailing commas innan ] eller }
   s = s.replace(/,(s*[}]])/g, '$1')
-  // Hitta arrayen
   const match = s.match(/[[sS]*]/)
   if (!match) return null
   try { return JSON.parse(match[0]) } catch(e) { return null }
@@ -21,16 +18,16 @@ app.post('/api/generate', async (req, res) => {
     const { channels=['instagram'], brief='', style='standard' } = req.body
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY saknas' })
-    const prompt = 'Du ar copywriter for spot. creative studio. Ton: professionell men varm, kreativ. Brief: '+(brief||'Generellt om spot.')+'. Kanaler: '+channels.join(', ')+'. Generera 3 unika forslag. Svara ENDAST med en JSON-array utan markdown, inga backticks, inga kodblock: [{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."}]'
+    const prompt = 'Du ar copywriter for spot. creative studio Halmstad. Ton: professionell, varm, kreativ. Brief: '+(brief||'Generellt om spot.')+'. Kanaler: '+channels.join(', ')+'. Generera EXAKT 3 korta forslag. Varje forslag max 150 ord. Svara ENDAST med JSON-array: [{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."}]'
     const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key='+apiKey, {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ contents: [{parts: [{text: prompt}]}], generationConfig: {temperature: 0.9, maxOutputTokens: 2000} })
+      body: JSON.stringify({ contents: [{parts: [{text: prompt}]}], generationConfig: {temperature: 0.9, maxOutputTokens: 8192} })
     })
     const data = await r.json()
     if (data.error) throw new Error('Gemini API: ' + data.error.message)
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
     const proposals = parseJsonSafe(text)
-    if (!proposals) throw new Error('Kunde inte parsa svar: ' + text.slice(0,400))
+    if (!proposals) throw new Error('Kunde inte parsa: ' + text.slice(0,300))
     res.json({ proposals })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
