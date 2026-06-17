@@ -4,6 +4,18 @@ const app = express()
 const PORT = process.env.PORT || 3000
 app.use(express.json({ limit: '10mb' }))
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'poc.html')) })
+
+function parseJsonSafe(text) {
+  // Rensa markdown
+  let s = text.replace(/```json/g,'').replace(/```/g,'').trim()
+  // Ta bort trailing commas innan ] eller }
+  s = s.replace(/,(s*[}]])/g, '$1')
+  // Hitta arrayen
+  const match = s.match(/[[sS]*]/)
+  if (!match) return null
+  try { return JSON.parse(match[0]) } catch(e) { return null }
+}
+
 app.post('/api/generate', async (req, res) => {
   try {
     const { channels=['instagram'], brief='', style='standard' } = req.body
@@ -17,10 +29,9 @@ app.post('/api/generate', async (req, res) => {
     const data = await r.json()
     if (data.error) throw new Error('Gemini API: ' + data.error.message)
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    const clean = text.replace(/```json/g,'').replace(/```/g,'').trim()
-    const match = clean.match(/[[sS]*]/)
-    if (!match) throw new Error('Svar fran Gemini: ' + clean.slice(0,400))
-    res.json({ proposals: JSON.parse(match[0]) })
+    const proposals = parseJsonSafe(text)
+    if (!proposals) throw new Error('Kunde inte parsa svar: ' + text.slice(0,400))
+    res.json({ proposals })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 app.post('/api/generate-image', async (req, res) => {
