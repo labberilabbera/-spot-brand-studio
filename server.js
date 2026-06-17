@@ -2,7 +2,7 @@ const express = require('express')
 const path = require('path')
 const app = express()
 const PORT = process.env.PORT || 3000
-app.use(express.json({ limit: '10mb' }))
+app.use(express.json({ limit: '20mb' }))
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'poc.html')) })
 
 app.post('/api/generate', async (req, res) => {
@@ -24,16 +24,37 @@ app.post('/api/generate', async (req, res) => {
     const start = s.indexOf('['); const end = s.lastIndexOf(']')
     if (start === -1 || end === -1) throw new Error('Ingen array: '+s.slice(0,100))
     const flatProposals = JSON.parse(s.slice(start, end+1))
-    // S.proposals = data.proposals, sen renderProposals gor S.proposals[ch]
-    // Sa proposals maste vara ett objekt med kanalnamn som nycklar
     const proposals = {}
     channelList.forEach(ch => { proposals[ch] = flatProposals })
     res.json({ proposals })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
+
 app.post('/api/generate-image', async (req, res) => {
-  res.json({ imageUrl: 'https://placehold.co/1080x1080/c8003c/ffffff?text=spot.' })
+  try {
+    const { brief='', style='modern' } = req.body
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY saknas' })
+    const prompt = 'Create a professional social media image for spot. creative studio in Halmstad, Sweden. Style: '+style+'. Brief: '+(brief||'Creative studio branding')+'. Minimalist, on-brand, high quality. Brand colors: deep red #c8003c, black, off-white.'
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key='+apiKey, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        contents: [{parts: [{text: prompt}]}],
+        generationConfig: {responseModalities: ['IMAGE','TEXT']}
+      })
+    })
+    const data = await r.json()
+    if (data.error) throw new Error('Gemini: ' + data.error.message)
+    const parts = data.candidates?.[0]?.content?.parts || []
+    const imgPart = parts.find(p => p.inlineData?.mimeType?.startsWith('image/'))
+    if (imgPart) {
+      const imageUrl = 'data:'+imgPart.inlineData.mimeType+';base64,'+imgPart.inlineData.data
+      return res.json({ imageUrl })
+    }
+    res.json({ imageUrl: 'https://placehold.co/1080x1080/c8003c/ffffff?text=spot.' })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
+
 app.post('/api/save-post', async (req, res) => {
   try {
     const { Pool } = require('pg')
