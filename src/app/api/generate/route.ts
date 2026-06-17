@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent'
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent'
 
 const BRAND = {
   name: 'spot.',
@@ -55,7 +55,7 @@ Generera 3 unika forslag. Svara ENDAST med giltig JSON-array, inget annat:
     const data = await res.json()
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
     const match = text.match(/[[sS]*]/)
-    if(!match) throw new Error('Ingen JSON i svaret: ' + text.slice(0,200))
+    if(!match) throw new Error('Ingen JSON: ' + text.slice(0,200))
     return NextResponse.json({ proposals: JSON.parse(match[0]) })
   } catch(err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
