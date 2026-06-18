@@ -1,15 +1,116 @@
 const express = require('express')
 const path = require('path')
 const fs = require('fs')
+const crypto = require('crypto')
 const app = express()
 const PORT = process.env.PORT || 3000
-app.use(express.json({ limit: '20mb' }))
 
-// UX-fixes + persistence injiceras precis innan sista </script>
+// Auth config - satt via env-variabler eller defaults
+const APP_PASSWORD = process.env.APP_PASSWORD || 'spot2024'
+const SESSION_SECRET = process.env.SESSION_SECRET || 'spot-secret-xK9m'
+const sessions = new Set()
+
+function makeToken() {
+  return crypto.randomBytes(32).toString('hex')
+}
+function authMiddleware(req, res, next) {
+  const cookie = req.headers.cookie || ''
+  const token = cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith('spot_session='))?.split('=')[1]
+  if (token && sessions.has(token)) return next()
+  res.redirect('/login')
+}
+
+app.use(express.json({ limit: '20mb' }))
+app.use(express.urlencoded({ extended: true }))
+
+// Login-sida
+const LOGIN_HTML = `<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>spot. Brand Studio — Logga in</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0f0f;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#fff;border-radius:20px;padding:40px 36px;width:min(380px,92vw);box-shadow:0 24px 60px rgba(0,0,0,.4)}
+.logo{font-size:28px;font-weight:800;color:#b31e59;letter-spacing:-1px;margin-bottom:4px}
+.tagline{font-size:13px;color:#9ca3af;margin-bottom:32px}
+label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px}
+input{width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:15px;outline:none;transition:border .2s}
+input:focus{border-color:#b31e59}
+.error{color:#b31e59;font-size:13px;margin-top:12px;display:none}
+.error.show{display:block}
+button{width:100%;margin-top:20px;padding:13px;background:#b31e59;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s}
+button:hover{background:#82093e}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">spot.</div>
+  <div class="tagline">content studio</div>
+  <form method="POST" action="/login">
+    <label>Lösenord</label>
+    <input type="password" name="password" placeholder="Ange lösenord" autofocus autocomplete="current-password"/>
+    <div class="error" id="err">Fel lösenord, försök igen.</div>
+    <button type="submit">Logga in</button>
+  </form>
+</div>
+<script>
+  const p = new URLSearchParams(location.search)
+  if (p.get('err')) document.getElementById('err').classList.add('show')
+</script>
+</body>
+</html>`
+
+app.get('/login', (req, res) => res.send(LOGIN_HTML))
+
+app.post('/login', (req, res) => {
+  const { password } = req.body
+  if (password === APP_PASSWORD) {
+    const token = makeToken()
+    sessions.add(token)
+    res.setHeader('Set-Cookie', `spot_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60*60*24*7}`)
+    res.redirect('/')
+  } else {
+    res.redirect('/login?err=1')
+  }
+})
+
+app.post('/logout', (req, res) => {
+  const cookie = req.headers.cookie || ''
+  const token = cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith('spot_session='))?.split('=')[1]
+  if (token) sessions.delete(token)
+  res.setHeader('Set-Cookie', 'spot_session=; Path=/; Max-Age=0')
+  res.redirect('/login')
+})
+
+// Persistence + UX inject
 const INJECT = `
 ;(function() {
+  // Logout-knapp i header
+  var header = document.querySelector('.topbar') || document.querySelector('header') || document.querySelector('nav');
+  if (!header) {
+    // Hitta topbar via inline style
+    var all = document.querySelectorAll('div');
+    all.forEach(function(d) {
+      if (d.style && d.style.background && d.style.background.includes('fff') && d.offsetHeight < 70 && d.offsetHeight > 0) {
+        if (!header) header = d;
+      }
+    });
+  }
+  // Lgg till logout-knapp overst till hoger
+  var logoutBtn = document.createElement('button');
+  logoutBtn.innerHTML = 'Logga ut';
+  logoutBtn.style.cssText = 'position:fixed;top:12px;right:16px;z-index:9999;background:none;border:1.5px solid #e5e7eb;border-radius:8px;padding:6px 14px;font-size:12px;color:#6b7280;cursor:pointer;font-family:inherit';
+  logoutBtn.onmouseover = function(){this.style.borderColor='#b31e59';this.style.color='#b31e59';};
+  logoutBtn.onmouseout = function(){this.style.borderColor='#e5e7eb';this.style.color='#6b7280';};
+  logoutBtn.onclick = function(){
+    fetch('/logout',{method:'POST'}).then(function(){location.href='/login';});
+  };
+  document.body.appendChild(logoutBtn);
 
-  // === PERSISTENCE ===
+  // PERSISTENCE
   var KEYS = ['reviewQueue','publishedPosts','selectedChannels','manualChannels','manualTags','imageStyle'];
   function save() {
     try { var d={}; KEYS.forEach(function(k){d[k]=S[k];}); localStorage.setItem('spot_state',JSON.stringify(d)); } catch(e){}
@@ -21,85 +122,59 @@ const INJECT = `
   setInterval(save, 2000);
   window.addEventListener('beforeunload', save);
 
-  // === UX FIX 1: Göm briefInput-fältet i modalen, ta bort placeholder-texten ===
-  // Vi döljer textarea och beskrivningstext i modalen
+  // UX: Gom brief-faltet, anvand rubrik+innehall
   window.addEventListener('load', function() {
     var briefEl = document.getElementById('briefInput');
-    if (briefEl) {
-      briefEl.parentElement && (briefEl.style.display = 'none');
-      // Göm också beskrivningstexten ovanför
-      var modal = document.getElementById('aiAssistModal');
-      if (modal) {
-        var divs = modal.querySelectorAll('div');
-        divs.forEach(function(d) {
-          if (d.textContent.includes('Beskriv vad') && d.style.fontSize === '13px') d.style.display = 'none';
-        });
-        // Ändra rubrik
-        divs.forEach(function(d) {
-          if (d.textContent.includes('Generera med AI') && d.style.fontSize === '16px') {
-            d.innerHTML = '✨ Generera AI-förslag på text';
-          }
-        });
-      }
+    if (briefEl) briefEl.style.display = 'none';
+    var modal = document.getElementById('aiAssistModal');
+    if (modal) {
+      modal.querySelectorAll('div').forEach(function(d) {
+        if (d.textContent.trim().startsWith('Beskriv vad') && getComputedStyle(d).fontSize === '13px') d.style.display='none';
+      });
+    }
+    // Gom kanalval i modal
+    var chGrid = document.getElementById('modalChGrid');
+    if (chGrid && chGrid.parentElement) {
+      chGrid.parentElement.style.display = 'none';
     }
   });
 
-  // === UX FIX 2: openAIAssist tar rubrik+innehall som brief ===
+  // UX: openAIAssist anvander befintliga faltvarden
   var _origOpen = window.openAIAssist;
   window.openAIAssist = function() {
-    // Fyll i briefInput med rubrik + innehall
-    var title = (document.getElementById('m-title') || {}).value || '';
-    var content = (document.getElementById('m-content') || {}).value || '';
-    var brief = [title, content].filter(Boolean).join('. ');
+    var title = (document.getElementById('m-title')||{}).value||'';
+    var content = (document.getElementById('m-content')||{}).value||'';
+    var brief = [title,content].filter(Boolean).join('. ');
     var briefEl = document.getElementById('briefInput');
     if (briefEl) briefEl.value = brief;
-    // Anropa original
+    // Synka modal-kanaler med S.selectedChannels
+    document.querySelectorAll('#modalChGrid .ch-pill').forEach(function(p){
+      var ch = p.getAttribute('data-ch');
+      if (S.selectedChannels && S.selectedChannels.includes(ch)) p.classList.add('active');
+      else p.classList.remove('active');
+    });
     if (_origOpen) _origOpen();
     else {
-      document.querySelectorAll('#modalChGrid .ch-pill').forEach(function(p){p.classList.add('active');});
-      document.getElementById('aiAssistModal').style.display = 'flex';
+      document.getElementById('aiAssistModal').style.display='flex';
     }
   };
 
-  // === UX FIX 3: selectProposal fyller i m-content och startar bildgenerering ===
+  // UX: selectProposal fyller i m-content
   var _origSelect = window.selectProposal;
   window.selectProposal = function(ch, idx) {
-    // Kör original forst
     if (_origSelect) _origSelect(ch, idx);
-    // Hämta valt förslag
     var proposals = S.proposals && S.proposals[ch];
-    if (!proposals || proposals[idx] === undefined) return;
+    if (!proposals || !proposals[idx]) return;
     var p = proposals[idx];
-    // Fyll i m-content och m-title
     var contentEl = document.getElementById('m-content');
     var titleEl = document.getElementById('m-title');
-    if (contentEl) { contentEl.value = p.content || ''; contentEl.dispatchEvent(new Event('input')); }
+    if (contentEl) { contentEl.value = p.content||''; contentEl.dispatchEvent(new Event('input')); }
     if (titleEl && p.title) { titleEl.value = p.title; titleEl.dispatchEvent(new Event('input')); }
   };
 
-  // === UX FIX 4: "Lägg till granskning" i propsal-vyn stänger AI-modal och genererar bild ===
-  var _origAddReview = window.addToReviewFromAI;
-  // Patcha addReviewBtn-knappen när den visas
-  var observer = new MutationObserver(function() {
-    var btn = document.getElementById('addReviewBtn');
-    if (btn && !btn._patched) {
-      btn._patched = true;
-      btn.addEventListener('click', function() {
-        // Stäng AI-modal
-        var modal = document.getElementById('aiAssistModal');
-        if (modal) modal.style.display = 'none';
-        // Trigga bildgenerering om generateImage finns
-        setTimeout(function() {
-          if (typeof generateImage === 'function') generateImage();
-        }, 300);
-      }, true);
-    }
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-
 }());`
 
-app.get('/', (req, res) => {
+app.get('/', authMiddleware, (req, res) => {
   const html = fs.readFileSync(path.join(__dirname, 'poc.html'), 'utf-8')
   const lastScript = html.lastIndexOf('</script>')
   const patched = html.slice(0, lastScript) + INJECT + html.slice(lastScript)
@@ -107,7 +182,7 @@ app.get('/', (req, res) => {
   res.send(patched)
 })
 
-app.post('/api/generate', async (req, res) => {
+app.post('/api/generate', authMiddleware, async (req, res) => {
   try {
     const { channels=['instagram'], brief='', style='standard', brand } = req.body
     const apiKey = process.env.GEMINI_API_KEY
@@ -132,7 +207,7 @@ app.post('/api/generate', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-app.post('/api/generate-image', async (req, res) => {
+app.post('/api/generate-image', authMiddleware, async (req, res) => {
   try {
     const { brief='', style='modern' } = req.body
     const apiKey = process.env.GEMINI_API_KEY
@@ -151,7 +226,7 @@ app.post('/api/generate-image', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-app.post('/api/save-post', async (req, res) => {
+app.post('/api/save-post', authMiddleware, async (req, res) => {
   try {
     const { Pool } = require('pg')
     const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
@@ -162,7 +237,7 @@ app.post('/api/save-post', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-app.get('/api/published-posts', async (req, res) => {
+app.get('/api/published-posts', authMiddleware, async (req, res) => {
   try {
     const { Pool } = require('pg')
     const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
