@@ -56,7 +56,7 @@ button:hover{background:#82093e}
       <label>Losenord</label>
       <input type="password" name="password" placeholder="Ange losenord" autocomplete="current-password"/>
     </div>
-    <div class="error" id="err">Fel användarnamn eller lösenord.</div>
+    <div class="error" id="err">Fel anvandarnamn eller losenord.</div>
     <button type="submit">Logga in</button>
   </form>
 </div>
@@ -88,6 +88,7 @@ app.post('/logout', (req, res) => {
 
 const INJECT = `
 ;(function() {
+
   // PERSISTENCE
   var KEYS = ['reviewQueue','publishedPosts','selectedChannels','manualChannels','manualTags','imageStyle'];
   function save() {
@@ -100,41 +101,131 @@ const INJECT = `
   setInterval(save, 2000);
   window.addEventListener('beforeunload', save);
 
-  // LOGGA UT — dropdown vid profilbubblan
+  // LOGOUT DROPDOWN vid profilbubblan
   window.addEventListener('load', function() {
-    // Hitta profilbubblan (den runda "A"-knappen overst till hoger)
     var avatarBtns = Array.from(document.querySelectorAll('div,button')).filter(function(el) {
-      var s = el.style;
       var txt = el.textContent.trim();
       return txt.length === 1 && /[A-Z]/.test(txt) && el.offsetWidth < 60 && el.offsetWidth > 24;
     });
     var avatar = avatarBtns[avatarBtns.length - 1];
-    if (!avatar) return;
+    if (avatar) {
+      var dropdown = document.createElement('div');
+      dropdown.id = 'logout-dropdown';
+      dropdown.style.cssText = 'display:none;position:fixed;top:52px;right:12px;background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:99999;min-width:160px;overflow:hidden;border:1px solid #f0f0f0';
+      dropdown.innerHTML = '<div style="padding:12px 16px;border-bottom:1px solid #f0f0f0"><div style="font-size:13px;font-weight:700;color:#111">Spot</div><div style="font-size:11px;color:#9ca3af">Administratör</div></div><button onclick="window._doLogout()" style="width:100%;padding:11px 16px;text-align:left;font-size:13px;color:#b31e59;font-weight:600;cursor:pointer;border:none;background:none;font-family:inherit">&#8594; Logga ut</button>';
+      document.body.appendChild(dropdown);
+      avatar.style.cursor = 'pointer';
+      avatar.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var d = document.getElementById('logout-dropdown');
+        d.style.display = d.style.display === 'none' ? 'block' : 'none';
+      });
+      document.addEventListener('click', function() {
+        var d = document.getElementById('logout-dropdown');
+        if (d) d.style.display = 'none';
+      });
+      window._doLogout = function() {
+        fetch('/logout',{method:'POST'}).then(function(){ location.href='/login'; });
+      };
+    }
 
-    // Skapa dropdown
-    var dropdown = document.createElement('div');
-    dropdown.id = 'logout-dropdown';
-    dropdown.style.cssText = 'display:none;position:fixed;top:52px;right:12px;background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:99999;min-width:160px;overflow:hidden;border:1px solid #f0f0f0';
-    dropdown.innerHTML = '<div style="padding:12px 16px;border-bottom:1px solid #f0f0f0"><div style="font-size:13px;font-weight:700;color:#111">Spot</div><div style="font-size:11px;color:#9ca3af">Administratör</div></div><button onclick="window._doLogout()" style="width:100%;padding:11px 16px;text-align:left;font-size:13px;color:#b31e59;font-weight:600;cursor:pointer;border:none;background:none;font-family:inherit;display:flex;align-items:center;gap:8px"><span>&#8594;</span> Logga ut</button>';
-    document.body.appendChild(dropdown);
+    // BILDSTIL-MODAL — visas istallet for direkt bildgenerering
+    var imgModal = document.createElement('div');
+    imgModal.id = 'img-style-modal';
+    imgModal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;align-items:center;justify-content:center';
+    imgModal.innerHTML = `
+      <div style="background:#fff;border-radius:16px;padding:24px;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+        <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:4px">Välj bildstil</div>
+        <div style="font-size:13px;color:#6b7280;margin-bottom:18px">Välj stil innan AI genererar bilden</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px" id="img-style-grid">
+          <div onclick="window._setImgStyle('natural',this)" data-style="natural" style="border:2px solid #e5e7eb;border-radius:10px;padding:14px 12px;cursor:pointer;text-align:center;transition:all .15s">
+            <div style="font-size:20px;margin-bottom:4px">🌿</div>
+            <div style="font-size:13px;font-weight:600;color:#111">Natural</div>
+            <div style="font-size:11px;color:#9ca3af">Naturliga färger</div>
+          </div>
+          <div onclick="window._setImgStyle('grayscale',this)" data-style="grayscale" style="border:2px solid #e5e7eb;border-radius:10px;padding:14px 12px;cursor:pointer;text-align:center;transition:all .15s">
+            <div style="font-size:20px;margin-bottom:4px">⬛</div>
+            <div style="font-size:13px;font-weight:600;color:#111">Grayscale</div>
+            <div style="font-size:11px;color:#9ca3af">Svartvitt</div>
+          </div>
+          <div onclick="window._setImgStyle('duotone',this)" data-style="duotone" style="border:2px solid #e5e7eb;border-radius:10px;padding:14px 12px;cursor:pointer;text-align:center;transition:all .15s">
+            <div style="font-size:20px;margin-bottom:4px">🎨</div>
+            <div style="font-size:13px;font-weight:600;color:#111">Duotone</div>
+            <div style="font-size:11px;color:#9ca3af">Spot.-rött</div>
+          </div>
+          <div onclick="window._setImgStyle('dark',this)" data-style="dark" style="border:2px solid #e5e7eb;border-radius:10px;padding:14px 12px;cursor:pointer;text-align:center;transition:all .15s">
+            <div style="font-size:20px;margin-bottom:4px">🌙</div>
+            <div style="font-size:13px;font-weight:600;color:#111">Dark</div>
+            <div style="font-size:11px;color:#9ca3af">Mörkt tema</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="window._skipImgStyle()" style="flex:1;padding:10px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;color:#6b7280;background:#fff;cursor:pointer">Hoppa över bild</button>
+          <button id="img-style-gen-btn" onclick="window._confirmImgStyle()" style="flex:1;padding:10px;background:#b31e59;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:none" disabled>Generera bild</button>
+        </div>
+      </div>`;
+    document.body.appendChild(imgModal);
 
-    // Toggla dropdown vid klick pa avatar
-    avatar.style.cursor = 'pointer';
-    avatar.addEventListener('click', function(e) {
-      e.stopPropagation();
-      var d = document.getElementById('logout-dropdown');
-      d.style.display = d.style.display === 'none' ? 'block' : 'none';
-    });
+    window._imgBrief = '';
+    window._selectedImgStyle = null;
 
-    // Stang vid klick utanfor
-    document.addEventListener('click', function() {
-      var d = document.getElementById('logout-dropdown');
-      if (d) d.style.display = 'none';
-    });
+    window._setImgStyle = function(style, el) {
+      window._selectedImgStyle = style;
+      S.imageStyle = style;
+      document.querySelectorAll('#img-style-grid [data-style]').forEach(function(d) {
+        d.style.border = '2px solid #e5e7eb';
+        d.style.background = '#fff';
+      });
+      el.style.border = '2px solid #b31e59';
+      el.style.background = '#fff5f7';
+      document.getElementById('img-style-gen-btn').disabled = false;
+    };
 
-    // Logout-funktion
-    window._doLogout = function() {
-      fetch('/logout', {method:'POST'}).then(function() { location.href = '/login'; });
+    window._skipImgStyle = function() {
+      document.getElementById('img-style-modal').style.display = 'none';
+    };
+
+    window._confirmImgStyle = function() {
+      document.getElementById('img-style-modal').style.display = 'none';
+      if (typeof generateBrandImage === 'function') {
+        generateBrandImage(window._imgBrief, true);
+      }
+    };
+
+    // Markera aktiv stil vid öppning
+    window._openImgStyleModal = function(brief) {
+      window._imgBrief = brief;
+      window._selectedImgStyle = null;
+      document.getElementById('img-style-gen-btn').disabled = true;
+      document.querySelectorAll('#img-style-grid [data-style]').forEach(function(d) {
+        d.style.border = '2px solid #e5e7eb';
+        d.style.background = '#fff';
+        if (d.getAttribute('data-style') === S.imageStyle) {
+          d.style.border = '2px solid #b31e59';
+          d.style.background = '#fff5f7';
+          window._selectedImgStyle = S.imageStyle;
+          document.getElementById('img-style-gen-btn').disabled = false;
+        }
+      });
+      document.getElementById('img-style-modal').style.display = 'flex';
+    };
+
+    // STOPPA automatisk bildgenerering — overskrid generateBrandImage
+    var _origGenImage = window.generateBrandImage;
+    window.generateBrandImage = function(brief, force) {
+      // Om force=true (manuellt klick eller fran var modal) — kör direkt
+      if (force === true && window._imgStyleConfirmed) {
+        window._imgStyleConfirmed = false;
+        if (_origGenImage) return _origGenImage(brief, force);
+        return;
+      }
+      // Annars — visa stilväljaren istallet
+      window._openImgStyleModal(brief || window._imgBrief || '');
+    };
+    window._confirmImgStyle = function() {
+      document.getElementById('img-style-modal').style.display = 'none';
+      window._imgStyleConfirmed = true;
+      if (_origGenImage) _origGenImage(window._imgBrief, true);
     };
   });
 
@@ -181,6 +272,7 @@ const INJECT = `
     if (contentEl) { contentEl.value = p.content||''; contentEl.dispatchEvent(new Event('input')); }
     if (titleEl && p.title) { titleEl.value = p.title; titleEl.dispatchEvent(new Event('input')); }
   };
+
 }());`
 
 app.get('/', authMiddleware, (req, res) => {
