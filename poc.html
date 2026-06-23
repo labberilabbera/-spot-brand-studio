@@ -452,6 +452,7 @@ textarea.field-input{resize:none;line-height:1.5}
         <div class="page-title">Dashboard</div>
         <div class="page-sub">Välkommen tillbaka! Översikt av ditt innehåll.</div>
       </div>
+      <div id="dashPeriodBar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:12px;color:#6b7280;font-weight:600">Period:</span><button class="dp-btn" data-p="today" onclick="setDashPeriod('today')">Idag</button><button class="dp-btn" data-p="7" onclick="setDashPeriod('7')">7 dagar</button><button class="dp-btn" data-p="30" onclick="setDashPeriod('30')">30 dagar</button><button class="dp-btn" data-p="all" onclick="setDashPeriod('all')">Allt</button><span style="width:1px;height:20px;background:#e5e7eb;margin:0 4px"></span><input type="date" id="dpFrom" onchange="setDashRange()" style="font-size:12px;padding:5px 8px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:inherit"><span style="font-size:12px;color:#9ca3af">till</span><input type="date" id="dpTo" onchange="setDashRange()" style="font-size:12px;padding:5px 8px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:inherit"></div>
       <div class="stats-grid">
         <div class="stat-card"><div class="stat-icon" style="background:#f9fafb">📄</div><div class="stat-label">Totalt skapat</div><div class="stat-val" id="s-total">0</div></div>
         <div class="stat-card"><div class="stat-icon" style="background:#fffbeb">👁</div><div class="stat-label">Under granskning</div><div class="stat-val" id="s-review">0</div></div>
@@ -1308,13 +1309,21 @@ function updatePubDropdown() {
 // ════════════════════════════════════════════════════════
 //  DASHBOARD
 // ════════════════════════════════════════════════════════
+function dashInPeriod(p){var d=new Date(p.createdAt).getTime();if(!S.dashFrom&&!S.dashTo){var per=S.dashPeriod||"all";if(per==="all")return true;var now=new Date();if(per==="today"){return new Date(p.createdAt).toDateString()===now.toDateString();}var days=parseInt(per,10);return d>=now.getTime()-days*86400000;}if(S.dashFrom&&d<new Date(S.dashFrom+"T00:00:00").getTime())return false;if(S.dashTo&&d>new Date(S.dashTo+"T23:59:59").getTime())return false;return true;}
+function paintDashBtns(){document.querySelectorAll(".dp-btn").forEach(function(b){var active=!S.dashFrom&&!S.dashTo&&(S.dashPeriod||"all")===b.dataset.p;b.style.cssText="font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer;font-family:inherit;border:1.5px solid "+(active?"#b31e59":"#e5e7eb")+";background:"+(active?"#b31e59":"#fff")+";color:"+(active?"#fff":"#374151")+";font-weight:"+(active?"600":"500");});}
+function setDashPeriod(p){S.dashPeriod=p;S.dashFrom=null;S.dashTo=null;var f=document.getElementById("dpFrom"),t=document.getElementById("dpTo");if(f)f.value="";if(t)t.value="";renderDashboard();}
+function setDashRange(){var f=document.getElementById("dpFrom").value,t=document.getElementById("dpTo").value;S.dashFrom=f||null;S.dashTo=t||null;if(S.dashFrom||S.dashTo)S.dashPeriod=null;renderDashboard();}
 function renderDashboard() {
-  const total = S.reviewQueue.length + S.publishedPosts.length;
+  if (S.dashPeriod === undefined) S.dashPeriod = "all";
+  paintDashBtns();
+  const rq = S.reviewQueue.filter(dashInPeriod);
+  const pp = S.publishedPosts.filter(dashInPeriod);
+  const total = rq.length + pp.length;
   document.getElementById('s-total').textContent = total;
-  document.getElementById('s-review').textContent = S.reviewQueue.length;
-  document.getElementById('s-pub').textContent = S.publishedPosts.length;
-  document.getElementById('s-rate').textContent = total > 0 ? Math.round(S.publishedPosts.length / total * 100) + '%' : '0%';
-  const all = [...S.reviewQueue, ...S.publishedPosts].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6);
+  document.getElementById('s-review').textContent = rq.length;
+  document.getElementById('s-pub').textContent = pp.length;
+  document.getElementById('s-rate').textContent = total > 0 ? Math.round(pp.length / total * 100) + '%' : '0%';
+  const all = [...rq, ...pp].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6);
   const rp = document.getElementById('recentPosts');
   rp.innerHTML = all.length === 0
     ? '<div style="padding:32px;text-align:center;color:#9ca3af;font-size:13px">Inga inlägg ännu.<br><span style="color:var(--m);cursor:pointer" onclick="navigate(\'create\')">Skapa ditt första inlägg</span></div>'
@@ -1327,19 +1336,19 @@ function renderDashboard() {
         <span class="status-pill ${p.status === 'published' ? 's-pub' : 's-review'}">${p.status === 'published' ? 'Publicerat' : 'Granskning'}</span>
       </div>`).join('');
   [['instagram','ig'],['linkedin','li'],['facebook','fb'],['tiktok','tt']].forEach(([ch, id]) => {
-    const cnt = S.publishedPosts.filter(p => p.channel === ch).length;
+    const cnt = pp.filter(p => p.channel === ch).length;
     document.getElementById('cb-' + id).textContent = cnt;
-    document.getElementById('cf-' + id).style.width = S.publishedPosts.length > 0 ? (cnt / S.publishedPosts.length * 100) + '%' : '0%';
+    document.getElementById('cf-' + id).style.width = pp.length > 0 ? (cnt / pp.length * 100) + '%' : '0%';
   });
 
   // Publicerade-sektion
   const pubGrid = document.getElementById('pubGrid');
   const pubCount = document.getElementById('pubCount');
-  pubCount.textContent = S.publishedPosts.length > 0 ? `(${S.publishedPosts.length})` : '';
-  if (S.publishedPosts.length === 0) {
+  pubCount.textContent = pp.length > 0 ? `(${pp.length})` : '';
+  if (pp.length === 0) {
     pubGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:24px;font-size:13px;color:#9ca3af">Inga publicerade inlägg ännu.</div>';
   } else {
-    pubGrid.innerHTML = [...S.publishedPosts].reverse().map(p => `
+    pubGrid.innerHTML = [...pp].reverse().map(p => `
       <div style="border:1.5px solid #e5e7eb;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)">
         <div style="aspect-ratio:1;overflow:hidden">${getPostImageHTML(p)}</div>
         <div style="padding:8px 10px">
