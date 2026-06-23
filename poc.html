@@ -459,6 +459,10 @@ textarea.field-input{resize:none;line-height:1.5}
         <div class="stat-card"><div class="stat-icon" style="background:#f0fdf4">✅</div><div class="stat-label">Publicerade</div><div class="stat-val" id="s-pub">0</div></div>
         <div class="stat-card"><div class="stat-icon" style="background:#fff5f7">📈</div><div class="stat-label">Aktivitet</div><div class="stat-val" id="s-rate">0%</div></div>
       </div>
+      <div class="card" style="padding:0">
+        <div class="card-header">Allt skapat per dag</div>
+        <div id="dashChart" style="padding:14px 16px"></div>
+      </div>
       <div class="dash-grid">
         <div class="card">
           <div class="card-header">Senaste inlägg <span style="font-size:12px;color:var(--m);cursor:pointer" onclick="navigate('published')">Visa alla</span></div>
@@ -1309,6 +1313,37 @@ function updatePubDropdown() {
 // ════════════════════════════════════════════════════════
 //  DASHBOARD
 // ════════════════════════════════════════════════════════
+function renderDashChart(items){
+  var el=document.getElementById("dashChart"); if(!el) return;
+  var now=new Date(); var s,e;
+  if(S.dashFrom||S.dashTo){
+    s=S.dashFrom?new Date(S.dashFrom+"T00:00:00"):(items.length?new Date(Math.min.apply(null,items.map(function(p){return new Date(p.createdAt).getTime();}))):now);
+    e=S.dashTo?new Date(S.dashTo+"T00:00:00"):now;
+  } else {
+    var per=S.dashPeriod||"all"; e=new Date(now);
+    if(per==="today"){s=new Date(now);}
+    else if(per==="all"){s=items.length?new Date(Math.min.apply(null,items.map(function(p){return new Date(p.createdAt).getTime();}))):new Date(now.getTime()-6*86400000);}
+    else{s=new Date(now.getTime()-(parseInt(per,10)-1)*86400000);}
+  }
+  s=new Date(s); s.setHours(0,0,0,0); e=new Date(e); e.setHours(0,0,0,0); if(e<s)e=new Date(s);
+  function key(d){var x=new Date(d);x.setHours(0,0,0,0);return x.getFullYear()+"-"+("0"+(x.getMonth()+1)).slice(-2)+"-"+("0"+x.getDate()).slice(-2);}
+  var days=[],cur=new Date(s),g=0; while(cur<=e&&g<400){days.push(key(cur));cur.setDate(cur.getDate()+1);g++;}
+  var counts={}; items.forEach(function(p){var k=key(p.createdAt);counts[k]=(counts[k]||0)+1;});
+  var data=days.map(function(k){return {k:k,v:counts[k]||0};});
+  if(items.length===0){el.innerHTML='<div style="text-align:center;color:#9ca3af;font-size:13px;padding:24px">Inga inlägg i vald period.</div>';return;}
+  var W=600,H=180,pL=30,pR=14,pT=14,pB=26,n=data.length;
+  var maxV=1; data.forEach(function(d){if(d.v>maxV)maxV=d.v;});
+  function X(i){return n<=1?(pL+(W-pL-pR)/2):pL+i*(W-pL-pR)/(n-1);}
+  function Y(v){return pT+(H-pT-pB)*(1-v/maxV);}
+  var line=data.map(function(d,i){return (i?"L":"M")+X(i).toFixed(1)+" "+Y(d.v).toFixed(1);}).join(" ");
+  var area="M"+X(0).toFixed(1)+" "+Y(0).toFixed(1)+" "+data.map(function(d,i){return "L"+X(i).toFixed(1)+" "+Y(d.v).toFixed(1);}).join(" ")+" L"+X(n-1).toFixed(1)+" "+Y(0).toFixed(1)+" Z";
+  var dots=data.map(function(d,i){return d.v>0?('<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(d.v).toFixed(1)+'" r="3" fill="#b31e59"></circle>'):"";}).join("");
+  var step=Math.max(1,Math.ceil(n/6)); var xlab="";
+  for(var i=0;i<n;i+=step){xlab+='<text x="'+X(i).toFixed(1)+'" y="'+(H-8)+'" font-size="9" fill="#9ca3af" text-anchor="middle">'+data[i].k.slice(5)+'</text>';}
+  var ylab='<text x="4" y="'+(pT+4)+'" font-size="9" fill="#9ca3af">'+maxV+'</text><text x="4" y="'+(H-pB)+'" font-size="9" fill="#9ca3af">0</text>';
+  var grid='<line x1="'+pL+'" y1="'+(H-pB)+'" x2="'+(W-pR)+'" y2="'+(H-pB)+'" stroke="#e5e7eb" stroke-width="1"></line>';
+  el.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block" preserveAspectRatio="xMidYMid meet"><path d="'+area+'" fill="rgba(179,30,89,0.08)"></path><path d="'+line+'" fill="none" stroke="#b31e59" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>'+dots+grid+xlab+ylab+'</svg>';
+}
 function dashInPeriod(p){var d=new Date(p.createdAt).getTime();if(!S.dashFrom&&!S.dashTo){var per=S.dashPeriod||"all";if(per==="all")return true;var now=new Date();if(per==="today"){return new Date(p.createdAt).toDateString()===now.toDateString();}var days=parseInt(per,10);return d>=now.getTime()-days*86400000;}if(S.dashFrom&&d<new Date(S.dashFrom+"T00:00:00").getTime())return false;if(S.dashTo&&d>new Date(S.dashTo+"T23:59:59").getTime())return false;return true;}
 function paintDashBtns(){document.querySelectorAll(".dp-btn").forEach(function(b){var active=!S.dashFrom&&!S.dashTo&&(S.dashPeriod||"all")===b.dataset.p;b.style.cssText="font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer;font-family:inherit;border:1.5px solid "+(active?"#b31e59":"#e5e7eb")+";background:"+(active?"#b31e59":"#fff")+";color:"+(active?"#fff":"#374151")+";font-weight:"+(active?"600":"500");});}
 function setDashPeriod(p){S.dashPeriod=p;S.dashFrom=null;S.dashTo=null;var f=document.getElementById("dpFrom"),t=document.getElementById("dpTo");if(f)f.value="";if(t)t.value="";renderDashboard();}
@@ -1318,6 +1353,7 @@ function renderDashboard() {
   paintDashBtns();
   const rq = S.reviewQueue.filter(dashInPeriod);
   const pp = S.publishedPosts.filter(dashInPeriod);
+  renderDashChart([...rq, ...pp]);
   const total = rq.length + pp.length;
   document.getElementById('s-total').textContent = total;
   document.getElementById('s-review').textContent = rq.length;
