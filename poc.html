@@ -516,7 +516,7 @@ textarea.field-input{resize:none;line-height:1.5}
         <div class="section-card" style="display:flex;flex-direction:column;gap:4px">
           <div style="display:flex;align-items:center;justify-content:space-between">
             <div class="field-label">Innehåll</div>
-            <button onclick="openAIAssist()" style="font-size:11px;color:var(--m);font-weight:600;padding:3px 10px;border:1.5px solid var(--m);border-radius:6px;background:#fff5f7;cursor:pointer">✨ Generera med AI</button>
+            <button id="genFromPostBtn" onclick="generateFromPost()" style="font-size:11px;color:var(--m);font-weight:600;padding:3px 10px;border:1.5px solid var(--m);border-radius:6px;background:#fff5f7;cursor:pointer">✨ Generera med AI</button>
           </div>
           <textarea class="field-input" id="m-content" rows="6" placeholder="Skriv ditt inlägg här..." oninput="updateManualPreview()"></textarea>
         </div>
@@ -1699,6 +1699,7 @@ function getBrandProfile() {
     forbidden: FORBIDDEN,
   };
 }
+async function generateFromPost(){var title=(document.getElementById("m-title").value||"").trim();var content=(document.getElementById("m-content").value||"").trim();var channels=[...document.querySelectorAll("#manualChGrid .ch-pill.active")].map(function(t){return t.dataset.ch;});if(!channels.length){if(typeof showToast==="function")showToast("Välj minst en kanal först");return;}var brief=((title?("Titel: "+title+". "):"")+(content?("Innehåll: "+content):"")).trim();if(!brief){if(typeof showToast==="function")showToast("Fyll i titel eller innehåll först");return;}var btn=document.getElementById("genFromPostBtn");if(btn){btn.disabled=true;btn.dataset.ot=btn.textContent;btn.textContent="✨ Genererar...";}try{var brand=(typeof getBrandProfile==="function")?getBrandProfile():undefined;var res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({brief:brief,channels:channels,brand:brand})});var data=await res.json();if(!res.ok)throw new Error(data.error||"API-fel");var hasAny=channels.some(function(ch){return (data.proposals[ch]||[]).length>0;});if(hasAny){S.manualChannels=channels;S.manualChannel=channels[0];renderMultiChannelProposals(data.proposals,channels);if(typeof showToast==="function")showToast("✨ Förslag klara — välj ett per kanal!");if(!S._uploadedImageUrl)generateBrandImage(brief);}else{if(typeof showToast==="function")showToast("Inga förslag genererades. Försök igen.");}}catch(e){if(typeof showToast==="function")showToast("Fel: "+e.message);}if(btn){btn.disabled=false;btn.textContent=btn.dataset.ot||"✨ Generera med AI";}}
 async function generateAndFill() {
   const brief = document.getElementById('briefInput').value.trim();
   if (!brief) return;
