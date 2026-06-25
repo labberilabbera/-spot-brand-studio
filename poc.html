@@ -550,11 +550,12 @@ textarea.field-input{resize:none;line-height:1.5}
           </div>
           <!-- Drag-to-reposition frame (shown after upload) -->
           <div id="imgRepoFrame" style="display:none;position:relative;border-radius:12px;overflow:hidden;height:160px;border:2px solid var(--m);cursor:grab;user-select:none" title="Dra för att ändra bildposition">
-            <img id="imgPreview" src="" style="position:absolute;width:120%;height:120%;object-fit:cover;object-position:50% 50%;pointer-events:none;border-radius:0">
+            <img id="imgPreview" src="" style="position:absolute;width:100%;height:100%;object-fit:cover;object-position:center;transform-origin:center;pointer-events:none;border-radius:0">
             <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
               <div id="imgDragHint" style="background:rgba(0,0,0,.5);color:#fff;font-size:11px;font-weight:600;padding:5px 12px;border-radius:99px;backdrop-filter:blur(4px)">✥ Dra för att justera</div>
             </div>
           </div>
+          <div id="imgEditControls" style="display:none;flex-direction:column;gap:6px;margin-top:8px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#6b7280;font-weight:600">Zoom</span><input type="range" id="imgZoom" min="1" max="3" step="0.05" value="1" oninput="setImgZoom(this.value)" style="flex:1"></div><div style="display:flex;gap:6px"><input id="imgReprompt" placeholder="Beskriv en ändring av bilden (valfritt)..." style="flex:1;font-size:12px;border:1.5px solid #e5e7eb;border-radius:8px;padding:6px 8px;font-family:inherit"><button onclick="repromptImage()" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:none;background:var(--m);color:#fff;cursor:pointer;white-space:nowrap">🎨 Ny bild</button></div></div>
           <input type="file" id="imgFileInput" accept="image/*" style="display:none" onchange="handleImgSelect(event)">
           <button id="imgRemoveBtn" onclick="removeImg()" style="display:none;font-size:12px;color:#ef4444;border:1.5px solid #fecaca;border-radius:8px;padding:5px 12px;background:#fff;cursor:pointer;align-self:flex-start">✕ Ta bort bild</button>
         </div>
@@ -970,9 +971,16 @@ const MOCK_PROPOSALS = {
 //  LAYOUT RENDERER
 // ════════════════════════════════════════════════════════
 // Returns object-position CSS value — reads from post if available, else global drag state
+function applyImgPreviewTransform(){var pv=document.getElementById("imgPreview");if(!pv)return;var p=S._imgPos||{x:0,y:0,zoom:1};var z=(p.zoom||1)*1.15;var mx=(1-1/z)*50;var x=Math.max(-mx,Math.min(mx,p.x||0));var y=Math.max(-mx,Math.min(mx,p.y||0));pv.style.objectPosition="center";pv.style.transform="scale("+z.toFixed(3)+") translate("+x.toFixed(2)+"%,"+y.toFixed(2)+"%)";}
+function setImgZoom(v){if(!S._imgPos)S._imgPos={x:0,y:0,zoom:1};S._imgPos.zoom=parseFloat(v)||1;applyImgPreviewTransform();if(window._aiProposals&&window._allChannelProposals){renderProposalCards(window._activeProposalTab||S.manualChannel);}else{updateManualPreview();}}
+function repromptImage(){var t=document.getElementById("imgReprompt");var extra=t?t.value.trim():"";var base=S._aiImageBrief||S._lastBrief||"";if(!base&&!extra){showToast("Generera förslag först eller skriv en beskrivning.");return;}if(S._uploadedImageUrl){showToast("Ta bort den uppladdade bilden för att använda AI-bild.");return;}var brief=extra?(base?(base+". Ändring: "+extra):extra):base;generateBrandImage(brief,true);}
 function _imgObjPos(post) {
-  const p = (post && post.imgPos) ? post.imgPos : (S._imgPos || { x: 50, y: 50 });
-  return `${p.x}% ${p.y}%`;
+  const p = (post && post.imgPos) ? post.imgPos : (S._imgPos || { x: 0, y: 0, zoom: 1 });
+  const z = (p.zoom || 1) * 1.15;
+  const mx = (1 - 1/z) * 50;
+  const x = Math.max(-mx, Math.min(mx, p.x || 0));
+  const y = Math.max(-mx, Math.min(mx, p.y || 0));
+  return 'center;transform:scale(' + z.toFixed(3) + ') translate(' + x.toFixed(2) + '%,' + y.toFixed(2) + '%);transform-origin:center';
 }
 // Returns CSS filter string + overlay rgba based on imageStyle setting
 function _imgStyleProps(post) {
@@ -1550,12 +1558,12 @@ function loadImgFile(file) {
   const reader = new FileReader();
   reader.onload = ev => {
     S._uploadedImageUrl = ev.target.result;
-    S._imgPos = { x: 50, y: 50 }; // reset position to center
+    S._imgPos = { x: 0, y: 0, zoom: 1 }; // reset position to center
     const preview = document.getElementById('imgPreview');
     preview.src = ev.target.result;
     preview.style.objectPosition = '50% 50%';
     document.getElementById('imgUploadArea').style.display = 'none';
-    document.getElementById('imgRepoFrame').style.display = 'block';
+    document.getElementById('imgRepoFrame').style.display = 'block';var _ec=document.getElementById('imgEditControls');if(_ec)_ec.style.display='flex';var _z=document.getElementById('imgZoom');if(_z)_z.value=1;applyImgPreviewTransform();
     document.getElementById('imgRemoveBtn').style.display = 'inline-flex';
     // Hide drag hint after 2s
     setTimeout(() => {
@@ -1585,8 +1593,8 @@ function loadImgFile(file) {
     if (!frame || !frame.contains(e.target)) return;
     dragging = true;
     startX = e.clientX; startY = e.clientY;
-    startPosX = S._imgPos?.x ?? 50;
-    startPosY = S._imgPos?.y ?? 50;
+    startPosX = S._imgPos?.x ?? 0;
+    startPosY = S._imgPos?.y ?? 0;
     frame.style.cursor = 'grabbing';
     const hint = document.getElementById('imgDragHint');
     if (hint) hint.style.opacity = '0';
@@ -1597,8 +1605,8 @@ function loadImgFile(file) {
     if (!frame || !frame.contains(e.target)) return;
     dragging = true;
     startX = e.touches[0].clientX; startY = e.touches[0].clientY;
-    startPosX = S._imgPos?.x ?? 50;
-    startPosY = S._imgPos?.y ?? 50;
+    startPosX = S._imgPos?.x ?? 0;
+    startPosY = S._imgPos?.y ?? 0;
     e.preventDefault();
   }, { passive: false });
 
@@ -1609,12 +1617,12 @@ function loadImgFile(file) {
     if (!frame || !preview) return;
     const rect = frame.getBoundingClientRect();
     // Convert pixel drag to percentage shift (inverted — drag right = show more left)
-    const dx = ((startX - clientX) / rect.width)  * 100;
-    const dy = ((startY - clientY) / rect.height) * 100;
-    const nx = Math.max(0, Math.min(100, startPosX + dx));
-    const ny = Math.max(0, Math.min(100, startPosY + dy));
-    S._imgPos = { x: nx, y: ny };
-    preview.style.objectPosition = `${nx}% ${ny}%`;
+    const z = ((S._imgPos&&S._imgPos.zoom)||1)*1.15; const mx=(1-1/z)*50; const dx = ((clientX - startX) / rect.width) * 100 / z;
+    const dy = ((clientY - startY) / rect.height) * 100 / z;
+    const nx = Math.max(-mx, Math.min(mx, startPosX + dx));
+    const ny = Math.max(-mx, Math.min(mx, startPosY + dy));
+    S._imgPos = { x: nx, y: ny, zoom: (S._imgPos&&S._imgPos.zoom)||1 };
+    applyImgPreviewTransform();
     // Live-update preview cards
     if (window._aiProposals && window._allChannelProposals) {
       const ch = window._activeProposalTab || S.manualChannel;
@@ -1650,7 +1658,7 @@ function removeImg() {
   if (frame) frame.style.display = 'none';
   const hint = document.getElementById('imgDragHint');
   if (hint) hint.style.opacity = '1';
-  S._imgPos = { x: 50, y: 50 };
+  S._imgPos = { x: 0, y: 0, zoom: 1 };
   if (fileInput) fileInput.value = '';
   if (window._aiProposals && window._allChannelProposals) {
     const ch = window._activeProposalTab || S.manualChannel;
@@ -1755,7 +1763,7 @@ async function generateBrandImage(brief, force) {
     if (!res.ok || !data.imageUrl) throw new Error(data.error || 'Bild misslyckades');
     S._aiImageUrl = data.imageUrl;
     S._aiImageBrief = brief;
-    S._aiImageStyle = S.imageStyle;if(!S._uploadedImageUrl){var _p=document.getElementById("imgPreview"),_f=document.getElementById("imgRepoFrame"),_u=document.getElementById("imgUploadArea");if(_p&&_f){_p.src=data.imageUrl;if(!S._imgPos)S._imgPos={x:50,y:50};_p.style.objectPosition=S._imgPos.x+"% "+S._imgPos.y+"%";_f.style.display="block";if(_u)_u.style.display="none";var _h=document.getElementById("imgDragHint");if(_h){_h.style.opacity="1";_h.textContent="Dra för att flytta bilden";}}var _b=document.getElementById("regenImgBtn");if(_b)_b.textContent="🎨 Ny bild";}
+    S._aiImageStyle = S.imageStyle;if(!S._uploadedImageUrl){var _p=document.getElementById("imgPreview"),_f=document.getElementById("imgRepoFrame"),_u=document.getElementById("imgUploadArea");if(_p&&_f){_p.src=data.imageUrl;if(!S._imgPos)S._imgPos={x:50,y:50};_p.style.objectPosition=S._imgPos.x+"% "+S._imgPos.y+"%";_f.style.display="block";if(_u)_u.style.display="none";var _ec=document.getElementById("imgEditControls");if(_ec)_ec.style.display="flex";var _zz=document.getElementById("imgZoom");if(_zz)_zz.value=((S._imgPos&&S._imgPos.zoom)||1);applyImgPreviewTransform();var _h=document.getElementById("imgDragHint");if(_h){_h.style.opacity="1";_h.textContent="Dra för att flytta bilden";}}var _b=document.getElementById("regenImgBtn");if(_b)_b.textContent="🎨 Ny bild";}
     showToast('🖼️ Varumärkesbild klar!');
   } catch (e) {
     showToast('⚠️ Kunde inte skapa bild: ' + e.message);
