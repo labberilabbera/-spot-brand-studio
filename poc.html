@@ -624,7 +624,7 @@ textarea.field-input{resize:none;line-height:1.5}
         <div class="prev-header">
           <div class="prev-title" id="prevPanelTitle">Förhandsvisning</div>
           <div class="prev-tabs" id="prevTabs"></div>
-          <button id="regenImgBtn" onclick="regenerateImage()" style="display:none;margin-left:auto;font-size:11px;font-weight:600;color:var(--m);border:1.5px solid var(--m);background:#fff5f7;border-radius:6px;padding:4px 10px;cursor:pointer">🎨 Ny bild</button>
+          <button id="regenImgBtn" onclick="regenerateImage()" style="display:none;margin-left:auto;font-size:11px;font-weight:600;color:var(--m);border:1.5px solid var(--m);background:#fff5f7;border-radius:6px;padding:4px 10px;cursor:pointer">🎨 Skapa bild</button>
         </div>
         <div class="prev-body" id="prevBody" style="padding:12px;align-items:stretch">
           <div class="prev-empty" id="prevEmpty">
@@ -1699,7 +1699,7 @@ function getBrandProfile() {
     forbidden: FORBIDDEN,
   };
 }
-async function generateFromPost(){var title=(document.getElementById("m-title").value||"").trim();var content=(document.getElementById("m-content").value||"").trim();var channels=[...document.querySelectorAll("#manualChGrid .ch-pill.active")].map(function(t){return t.dataset.ch;});if(!channels.length){if(typeof showToast==="function")showToast("Välj minst en kanal först");return;}var brief=((title?("Titel: "+title+". "):"")+(content?("Innehåll: "+content):"")).trim();if(!brief){if(typeof showToast==="function")showToast("Fyll i titel eller innehåll först");return;}var btn=document.getElementById("genFromPostBtn");if(btn){btn.disabled=true;btn.dataset.ot=btn.textContent;btn.textContent="✨ Genererar...";}try{var brand=(typeof getBrandProfile==="function")?getBrandProfile():undefined;var res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({brief:brief,channels:channels,brand:brand})});var data=await res.json();if(!res.ok)throw new Error(data.error||"API-fel");var hasAny=channels.some(function(ch){return (data.proposals[ch]||[]).length>0;});if(hasAny){S.manualChannels=channels;S.manualChannel=channels[0];renderMultiChannelProposals(data.proposals,channels);if(typeof showToast==="function")showToast("✨ Förslag klara — välj ett per kanal!");if(!S._uploadedImageUrl)generateBrandImage(brief);}else{if(typeof showToast==="function")showToast("Inga förslag genererades. Försök igen.");}}catch(e){if(typeof showToast==="function")showToast("Fel: "+e.message);}if(btn){btn.disabled=false;btn.textContent=btn.dataset.ot||"✨ Generera med AI";}}
+async function generateFromPost(){var title=(document.getElementById("m-title").value||"").trim();var content=(document.getElementById("m-content").value||"").trim();var channels=[...document.querySelectorAll("#manualChGrid .ch-pill.active")].map(function(t){return t.dataset.ch;});if(!channels.length){if(typeof showToast==="function")showToast("Välj minst en kanal först");return;}var brief=((title?("Titel: "+title+". "):"")+(content?("Innehåll: "+content):"")).trim();if(!brief){if(typeof showToast==="function")showToast("Fyll i titel eller innehåll först");return;}var btn=document.getElementById("genFromPostBtn");if(btn){btn.disabled=true;btn.dataset.ot=btn.textContent;btn.textContent="✨ Genererar...";}try{var brand=(typeof getBrandProfile==="function")?getBrandProfile():undefined;var res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({brief:brief,channels:channels,brand:brand})});var data=await res.json();if(!res.ok)throw new Error(data.error||"API-fel");var hasAny=channels.some(function(ch){return (data.proposals[ch]||[]).length>0;});if(hasAny){S.manualChannels=channels;S.manualChannel=channels[0];S._lastBrief=brief;renderMultiChannelProposals(data.proposals,channels);if(typeof showToast==="function")showToast("✨ Förslag klara! Tryck Skapa bild när du vill ha bild.");}else{if(typeof showToast==="function")showToast("Inga förslag genererades. Försök igen.");}}catch(e){if(typeof showToast==="function")showToast("Fel: "+e.message);}if(btn){btn.disabled=false;btn.textContent=btn.dataset.ot||"✨ Generera med AI";}}
 async function generateAndFill() {
   const brief = document.getElementById('briefInput').value.trim();
   if (!brief) return;
@@ -1726,7 +1726,7 @@ async function generateAndFill() {
       renderMultiChannelProposals(data.proposals, channels);
       showToast('✨ Förslag klara — välj ett per kanal!');
       // Generera en varumärkesanpassad bild från briefen (om ingen egen uppladdad)
-      if (!S._uploadedImageUrl) generateBrandImage(brief);
+      S._lastBrief = brief;
     } else {
       document.getElementById('error-msg').textContent = 'Inga förslag genererades. Försök igen.';
       document.getElementById('error-msg').style.display = 'block';
@@ -1755,7 +1755,7 @@ async function generateBrandImage(brief, force) {
     if (!res.ok || !data.imageUrl) throw new Error(data.error || 'Bild misslyckades');
     S._aiImageUrl = data.imageUrl;
     S._aiImageBrief = brief;
-    S._aiImageStyle = S.imageStyle;
+    S._aiImageStyle = S.imageStyle;if(!S._uploadedImageUrl){var _p=document.getElementById("imgPreview"),_f=document.getElementById("imgRepoFrame"),_u=document.getElementById("imgUploadArea");if(_p&&_f){_p.src=data.imageUrl;if(!S._imgPos)S._imgPos={x:50,y:50};_p.style.objectPosition=S._imgPos.x+"% "+S._imgPos.y+"%";_f.style.display="block";if(_u)_u.style.display="none";var _h=document.getElementById("imgDragHint");if(_h){_h.style.opacity="1";_h.textContent="Dra för att flytta bilden";}}var _b=document.getElementById("regenImgBtn");if(_b)_b.textContent="🎨 Ny bild";}
     showToast('🖼️ Varumärkesbild klar!');
   } catch (e) {
     showToast('⚠️ Kunde inte skapa bild: ' + e.message);
@@ -1767,7 +1767,7 @@ async function generateBrandImage(brief, force) {
 
 // Re-roll: generera ny bild från samma brief
 function regenerateImage() {
-  const brief = S._aiImageBrief || (document.getElementById('briefInput') ? document.getElementById('briefInput').value.trim() : '');
+  const brief = S._aiImageBrief || S._lastBrief || (document.getElementById('briefInput') ? document.getElementById('briefInput').value.trim() : '');
   if (!brief) { showToast('Generera förslag först så finns en brief att utgå från.'); return; }
   if (S._uploadedImageUrl) { showToast('Du har en uppladdad bild. Ta bort den för att använda AI-bild.'); return; }
   generateBrandImage(brief, true);
