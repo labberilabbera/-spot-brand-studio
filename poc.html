@@ -762,10 +762,10 @@ textarea.field-input{resize:none;line-height:1.5}
     <div class="pzm-card">
       <div class="pzm-thumb" id="pzmThumb"></div>
       <div class="pzm-info">
-        <div class="pzm-title" id="pzmTitle"></div>
-        <div class="pzm-content" id="pzmContent"></div>
+        <div class="pzm-title" id="pzmTitle" contenteditable="true" spellcheck="false" onblur="pzmEditField('title',this)" style="outline:none;cursor:text"></div>
+        <div class="pzm-content" id="pzmContent" contenteditable="true" spellcheck="false" onblur="pzmEditField('content',this)" style="outline:none;cursor:text"></div>
         <div class="pzm-tags" id="pzmTags"></div>
-        <div class="pzm-cta" id="pzmCta"></div>
+        <div class="pzm-cta" id="pzmCta" contenteditable="true" spellcheck="false" onblur="pzmEditField('cta',this)" style="outline:none;cursor:text"></div><div style="margin-top:14px;display:flex;gap:6px"><input id="pzmReprompt" placeholder="Beskriv hur bilden ska ändras..." style="flex:1;font-size:13px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;border-radius:8px;padding:8px 10px;outline:none"><button onclick="pzmReprompt()" style="font-size:13px;font-weight:600;padding:8px 14px;border-radius:8px;border:none;background:var(--m);color:#fff;cursor:pointer;white-space:nowrap">🎨 Skapa bild</button></div>
       </div>
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">
@@ -1771,6 +1771,7 @@ async function generateBrandImage(brief, force) {
   } finally {
     S._aiImageLoading = false;
     refreshActiveProposalCards();
+    if(document.getElementById("propZoomModal")&&document.getElementById("propZoomModal").classList.contains("open"))renderPzmSlide();
   }
 }
 
@@ -2923,6 +2924,8 @@ function pzmSelect() {
   selectProposalCard(_pzmCh, _pzmIdx);
   closePropZoom();
 }
+function pzmEditField(field, el){var props=(window._allChannelProposals||{})[_pzmCh]||[];var p=props[_pzmIdx];if(!p)return;var v=el.textContent.trim();if(field==="title")p.title=v;else if(field==="content")p.content=v;else if(field==="cta")p.cta=v;if((window._selectedProposalPerChannel||{})[_pzmCh]===_pzmIdx)fillFormFromProposal(p);renderPzmSlide();}
+function pzmReprompt(){var t=document.getElementById("pzmReprompt");var extra=t?t.value.trim():"";var base=S._aiImageBrief||S._lastBrief||"";if(!base&&!extra){showToast("Skriv en beskrivning av bilden.");return;}if(S._uploadedImageUrl){showToast("Ta bort uppladdad bild för att använda AI-bild.");return;}var brief=extra?(base?(base+". Ändring: "+extra):extra):base;showToast("🎨 Skapar bild...");generateBrandImage(brief,true);}
 function renderPzmSlide() {
   const props = (window._allChannelProposals || {})[_pzmCh] || [];
   const p = props[_pzmIdx];
