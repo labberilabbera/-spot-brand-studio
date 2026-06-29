@@ -764,8 +764,8 @@ textarea.field-input{resize:none;line-height:1.5}
       <div class="pzm-info">
         <div class="pzm-title" id="pzmTitle" contenteditable="true" spellcheck="false" onblur="pzmEditField('title',this)" style="outline:none;cursor:text"></div>
         <div class="pzm-content" id="pzmContent" contenteditable="true" spellcheck="false" onblur="pzmEditField('content',this)" style="outline:none;cursor:text"></div>
-        <div class="pzm-tags" id="pzmTags"></div>
-        <div class="pzm-cta" id="pzmCta" contenteditable="true" spellcheck="false" onblur="pzmEditField('cta',this)" style="outline:none;cursor:text"></div><div style="margin-top:14px;display:flex;gap:6px"><input id="pzmReprompt" placeholder="Beskriv hur bilden ska ändras..." style="flex:1;font-size:13px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;border-radius:8px;padding:8px 10px;outline:none"><button onclick="pzmReprompt()" style="font-size:13px;font-weight:600;padding:8px 14px;border-radius:8px;border:none;background:var(--m);color:#fff;cursor:pointer;white-space:nowrap">🎨 Skapa bild</button></div>
+        <div class="pzm-tags" id="pzmTags" contenteditable="true" spellcheck="false" onblur="pzmEditField('tags',this)" style="outline:none;cursor:text"></div>
+        <div class="pzm-cta" id="pzmCta" contenteditable="true" spellcheck="false" onblur="pzmEditField('cta',this)" style="outline:none;cursor:text"></div><div style="margin-top:12px;display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:rgba(255,255,255,.7)">Zoom</span><input type="range" id="pzmZoom" min="1" max="3" step="0.05" value="1" oninput="pzmSetZoom(this.value)" style="flex:1"></div><div style="margin-top:10px;display:flex;gap:6px"><input id="pzmReprompt" placeholder="Beskriv hur bilden ska ändras..." style="flex:1;font-size:13px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;border-radius:8px;padding:8px 10px;outline:none"><button onclick="pzmReprompt()" style="font-size:13px;font-weight:600;padding:8px 14px;border-radius:8px;border:none;background:var(--m);color:#fff;cursor:pointer;white-space:nowrap">🎨 Skapa bild</button></div>
       </div>
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">
@@ -2911,6 +2911,8 @@ function openProposalZoom(ch, idx) {
   _pzmCh = ch; _pzmIdx = idx;
   document.getElementById('propZoomModal').classList.add('open');
   renderPzmSlide();
+  setupPzmDrag();
+  var _zs=document.getElementById('pzmZoom'); if(_zs)_zs.value=((S._imgPos&&S._imgPos.zoom)||1);
 }
 function closePropZoom() {
   document.getElementById('propZoomModal').classList.remove('open');
@@ -2924,8 +2926,10 @@ function pzmSelect() {
   selectProposalCard(_pzmCh, _pzmIdx);
   closePropZoom();
 }
-function pzmEditField(field, el){var props=(window._allChannelProposals||{})[_pzmCh]||[];var p=props[_pzmIdx];if(!p)return;var v=el.textContent.trim();if(field==="title")p.title=v;else if(field==="content")p.content=v;else if(field==="cta")p.cta=v;if((window._selectedProposalPerChannel||{})[_pzmCh]===_pzmIdx)fillFormFromProposal(p);renderPzmSlide();}
+function pzmEditField(field, el){var props=(window._allChannelProposals||{})[_pzmCh]||[];var p=props[_pzmIdx];if(!p)return;var v=el.textContent.trim();if(field==="title")p.title=v;else if(field==="content")p.content=v;else if(field==="cta")p.cta=v;else if(field==="tags"){p.hashtags=v.split(/\s+/).map(function(s){return s.replace(/^#/,"");}).filter(Boolean);}if((window._selectedProposalPerChannel||{})[_pzmCh]===_pzmIdx)fillFormFromProposal(p);renderPzmSlide();}
 function pzmReprompt(){var t=document.getElementById("pzmReprompt");var extra=t?t.value.trim():"";var base=S._aiImageBrief||S._lastBrief||"";if(!base&&!extra){showToast("Skriv en beskrivning av bilden.");return;}if(S._uploadedImageUrl){showToast("Ta bort uppladdad bild för att använda AI-bild.");return;}var brief=extra?(base?(base+". Ändring: "+extra):extra):base;showToast("🎨 Skapar bild...");generateBrandImage(brief,true);}
+function setupPzmDrag(){var thumb=document.getElementById("pzmThumb");if(!thumb||thumb._dragSet)return;thumb._dragSet=true;thumb.style.cursor="grab";thumb.style.touchAction="none";var dragging=false,sx=0,sy=0,spx=0,spy=0;function applyLive(){var p=S._imgPos||{x:0,y:0,zoom:1};var z=(p.zoom||1)*1.15;var mx=(1-1/z)*50;var x=Math.max(-mx,Math.min(mx,p.x||0)),y=Math.max(-mx,Math.min(mx,p.y||0));thumb.querySelectorAll("img").forEach(function(im){im.style.objectPosition="center";im.style.transformOrigin="center";im.style.transform="scale("+z.toFixed(3)+") translate("+x.toFixed(2)+"%,"+y.toFixed(2)+"%)";});}thumb.addEventListener("pointerdown",function(e){dragging=true;thumb.style.cursor="grabbing";sx=e.clientX;sy=e.clientY;var p=S._imgPos||{x:0,y:0,zoom:1};spx=p.x||0;spy=p.y||0;try{thumb.setPointerCapture(e.pointerId);}catch(_){}e.preventDefault();});thumb.addEventListener("pointermove",function(e){if(!dragging)return;var r=thumb.getBoundingClientRect();var z=((S._imgPos&&S._imgPos.zoom)||1)*1.15;var mx=(1-1/z)*50;var nx=spx+(e.clientX-sx)/r.width*100/z;var ny=spy+(e.clientY-sy)/r.height*100/z;nx=Math.max(-mx,Math.min(mx,nx));ny=Math.max(-mx,Math.min(mx,ny));S._imgPos={x:nx,y:ny,zoom:(S._imgPos&&S._imgPos.zoom)||1};applyLive();});thumb.addEventListener("pointerup",function(e){if(!dragging)return;dragging=false;thumb.style.cursor="grab";if(typeof refreshActiveProposalCards==="function")refreshActiveProposalCards();});}
+function pzmSetZoom(v){if(!S._imgPos)S._imgPos={x:0,y:0,zoom:1};S._imgPos.zoom=parseFloat(v)||1;var thumb=document.getElementById("pzmThumb");if(!thumb)return;var p=S._imgPos;var z=(p.zoom||1)*1.15;var mx=(1-1/z)*50;var x=Math.max(-mx,Math.min(mx,p.x||0)),y=Math.max(-mx,Math.min(mx,p.y||0));thumb.querySelectorAll("img").forEach(function(im){im.style.objectPosition="center";im.style.transformOrigin="center";im.style.transform="scale("+z.toFixed(3)+") translate("+x.toFixed(2)+"%,"+y.toFixed(2)+"%)";});}
 function renderPzmSlide() {
   const props = (window._allChannelProposals || {})[_pzmCh] || [];
   const p = props[_pzmIdx];
