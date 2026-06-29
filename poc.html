@@ -555,7 +555,7 @@ textarea.field-input{resize:none;line-height:1.5}
               <div id="imgDragHint" style="background:rgba(0,0,0,.5);color:#fff;font-size:11px;font-weight:600;padding:5px 12px;border-radius:99px;backdrop-filter:blur(4px)">✥ Dra för att justera</div>
             </div>
           </div>
-          <div id="imgEditControls" style="display:none;flex-direction:column;gap:6px;margin-top:8px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#6b7280;font-weight:600">Zoom</span><input type="range" id="imgZoom" min="1" max="3" step="0.05" value="1" oninput="setImgZoom(this.value)" style="flex:1"></div><div style="display:flex;gap:6px"><input id="imgReprompt" placeholder="Beskriv en ändring av bilden (valfritt)..." style="flex:1;font-size:12px;border:1.5px solid #e5e7eb;border-radius:8px;padding:6px 8px;font-family:inherit"><button onclick="repromptImage()" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:none;background:var(--m);color:#fff;cursor:pointer;white-space:nowrap">🎨 Ny bild</button></div></div>
+          <div id="imgEditControls" style="display:none;flex-direction:column;gap:6px;margin-top:8px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#6b7280;font-weight:600">Zoom</span><input type="range" id="imgZoom" min="1" max="3" step="0.05" value="1" oninput="setImgZoom(this.value)" style="flex:1"></div><div id="imgRepromptRow" style="display:none;gap:6px"><input id="imgReprompt" placeholder="Beskriv en ändring av bilden (valfritt)..." style="flex:1;font-size:12px;border:1.5px solid #e5e7eb;border-radius:8px;padding:6px 8px;font-family:inherit"><button onclick="repromptImage()" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:none;background:var(--m);color:#fff;cursor:pointer;white-space:nowrap">🎨 Ny bild</button></div></div>
           <input type="file" id="imgFileInput" accept="image/*" style="display:none" onchange="handleImgSelect(event)">
           <button id="imgRemoveBtn" onclick="removeImg()" style="display:none;font-size:12px;color:#ef4444;border:1.5px solid #fecaca;border-radius:8px;padding:5px 12px;background:#fff;cursor:pointer;align-self:flex-start">✕ Ta bort bild</button>
         </div>
@@ -1707,7 +1707,7 @@ function getBrandProfile() {
     forbidden: FORBIDDEN,
   };
 }
-async function generateFromPost(){var title=(document.getElementById("m-title").value||"").trim();var content=(document.getElementById("m-content").value||"").trim();var channels=[...document.querySelectorAll("#manualChGrid .ch-pill.active")].map(function(t){return t.dataset.ch;});if(!channels.length){if(typeof showToast==="function")showToast("Välj minst en kanal först");return;}var brief=((title?("Titel: "+title+". "):"")+(content?("Innehåll: "+content):"")).trim();if(!brief){if(typeof showToast==="function")showToast("Fyll i titel eller innehåll först");return;}var btn=document.getElementById("genFromPostBtn");if(btn){btn.disabled=true;btn.dataset.ot=btn.textContent;btn.textContent="✨ Genererar...";}try{var brand=(typeof getBrandProfile==="function")?getBrandProfile():undefined;var res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({brief:brief,channels:channels,brand:brand})});var data=await res.json();if(!res.ok)throw new Error(data.error||"API-fel");var hasAny=channels.some(function(ch){return (data.proposals[ch]||[]).length>0;});if(hasAny){S.manualChannels=channels;S.manualChannel=channels[0];S._lastBrief=brief;renderMultiChannelProposals(data.proposals,channels);if(typeof showToast==="function")showToast("✨ Förslag klara! Tryck Skapa bild när du vill ha bild.");}else{if(typeof showToast==="function")showToast("Inga förslag genererades. Försök igen.");}}catch(e){if(typeof showToast==="function")showToast("Fel: "+e.message);}if(btn){btn.disabled=false;btn.textContent=btn.dataset.ot||"✨ Generera med AI";}}
+async function generateFromPost(){var title=(document.getElementById("m-title").value||"").trim();var content=(document.getElementById("m-content").value||"").trim();var channels=[...document.querySelectorAll("#manualChGrid .ch-pill.active")].map(function(t){return t.dataset.ch;});if(!channels.length){if(typeof showToast==="function")showToast("Välj minst en kanal först");return;}var brief=((title?("Titel: "+title+". "):"")+(content?("Innehåll: "+content):"")).trim();if(!brief){if(typeof showToast==="function")showToast("Fyll i titel eller innehåll först");return;}var btn=document.getElementById("genFromPostBtn");if(btn){btn.disabled=true;btn.dataset.ot=btn.textContent;btn.textContent="✨ Genererar...";}try{var brand=(typeof getBrandProfile==="function")?getBrandProfile():undefined;var res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({brief:brief,channels:channels,brand:brand})});var data=await res.json();if(!res.ok)throw new Error(data.error||"API-fel");var hasAny=channels.some(function(ch){return (data.proposals[ch]||[]).length>0;});if(hasAny){S.manualChannels=channels;S.manualChannel=channels[0];S._lastBrief=brief;renderMultiChannelProposals(data.proposals,channels);if(!S._uploadedImageUrl)generateBrandImage(brief);if(typeof showToast==="function")showToast("✨ Förslag klara!");}else{if(typeof showToast==="function")showToast("Inga förslag genererades. Försök igen.");}}catch(e){if(typeof showToast==="function")showToast("Fel: "+e.message);}if(btn){btn.disabled=false;btn.textContent=btn.dataset.ot||"✨ Generera med AI";}}
 async function generateAndFill() {
   const brief = document.getElementById('briefInput').value.trim();
   if (!brief) return;
@@ -1735,6 +1735,7 @@ async function generateAndFill() {
       showToast('✨ Förslag klara — välj ett per kanal!');
       // Generera en varumärkesanpassad bild från briefen (om ingen egen uppladdad)
       S._lastBrief = brief;
+      if (!S._uploadedImageUrl) generateBrandImage(brief);
     } else {
       document.getElementById('error-msg').textContent = 'Inga förslag genererades. Försök igen.';
       document.getElementById('error-msg').style.display = 'block';
@@ -1804,7 +1805,7 @@ function renderMultiChannelProposals(allProposals, channels) {
   const title = document.getElementById('prevPanelTitle');
   if (title) title.textContent = channels.length > 1 ? '✨ Välj ett förslag per kanal' : '✨ Välj ett förslag';
   const regenBtn = document.getElementById('regenImgBtn');
-  if (regenBtn) regenBtn.style.display = S._uploadedImageUrl ? 'none' : 'inline-block';
+  if (regenBtn) regenBtn.style.display = 'none';
 
   // Render channel tabs (only if multiple channels)
   const tabs = document.getElementById('prevTabs');
