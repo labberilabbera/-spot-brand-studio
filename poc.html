@@ -591,7 +591,7 @@ textarea.field-input{resize:none;line-height:1.5}
           </div>
         </div>
 
-        <button class="add-review-btn" onclick="addManualToReview()">+ Lägg till granskning</button>
+        <button class="add-review-btn" onclick="addManualToReview()">+ Lägg till granskning</button><div style="display:flex;gap:8px;margin-top:10px"><button onclick="saveDraft()" style="flex:1;font-size:13px;color:#374151;font-weight:600;padding:10px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer">💾 Spara utkast</button><button onclick="toggleDrafts()" style="flex:1;font-size:13px;color:#374151;font-weight:600;padding:10px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer">📝 Utkast</button></div><div id="draftsPanel" style="display:none;margin-top:8px;background:#fff;border:1px solid #eee;border-radius:10px;max-height:240px;overflow-y:auto"></div>
 
         <!-- AI ASSIST MODAL -->
         <div id="aiAssistModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:center;justify-content:center">
@@ -1707,6 +1707,41 @@ function getBrandProfile() {
     forbidden: FORBIDDEN,
   };
 }
+function _getDrafts(){ try{return JSON.parse(localStorage.getItem("spotDrafts")||"[]");}catch(e){return [];} }
+function _setDrafts(a){ try{localStorage.setItem("spotDrafts",JSON.stringify(a));}catch(e){} }
+function saveDraft(){
+  var t=document.getElementById("m-title"), c=document.getElementById("m-content");
+  var title=t?t.value:"", content=c?c.value:"";
+  var channels=[].slice.call(document.querySelectorAll("#manualChGrid .ch-pill.active")).map(function(p){return p.dataset.ch;});
+  if(!(title||"").trim()&&!(content||"").trim()){ showToast("Inget att spara – fyll i titel eller innehåll."); return; }
+  var drafts=_getDrafts();
+  drafts.unshift({ id:"d"+Date.now(), ts:Date.now(), title:title, content:content, channels:channels, proposals:(window._allChannelProposals||null), selected:(window._selectedProposalPerChannel||null), aiImageUrl:(S._aiImageUrl||null), imgPos:(S._imgPos||null), uploaded:(S._uploadedImageUrl||null) });
+  if(drafts.length>50)drafts=drafts.slice(0,50);
+  _setDrafts(drafts); showToast("💾 Utkast sparat!");
+  var el=document.getElementById("draftsPanel"); if(el&&el.style.display!=="none")renderDraftsPanel();
+}
+function deleteDraft(id){ _setDrafts(_getDrafts().filter(function(x){return x.id!==id;})); renderDraftsPanel(); }
+function openDraft(id){
+  var dft=_getDrafts().filter(function(x){return x.id===id;})[0]; if(!dft)return;
+  if(typeof navigate==="function")navigate("create");
+  setTimeout(function(){
+    var t=document.getElementById("m-title"); if(t)t.value=dft.title||"";
+    var c=document.getElementById("m-content"); if(c)c.value=dft.content||"";
+    [].slice.call(document.querySelectorAll("#manualChGrid .ch-pill")).forEach(function(p){ p.classList.toggle("active",(dft.channels||[]).indexOf(p.dataset.ch)>=0); });
+    if(dft.proposals){ window._allChannelProposals=dft.proposals; if(dft.selected)window._selectedProposalPerChannel=dft.selected; S._aiImageUrl=dft.aiImageUrl||null; S._imgPos=dft.imgPos||null; S._uploadedImageUrl=dft.uploaded||null; var chs=Object.keys(dft.proposals); if(chs.length&&typeof renderMultiChannelProposals==="function")renderMultiChannelProposals(dft.proposals,(dft.channels&&dft.channels.length)?dft.channels:chs); }
+    var pnl=document.getElementById("draftsPanel"); if(pnl)pnl.style.display="none";
+    showToast("Utkast öppnat");
+  },150);
+}
+function renderDraftsPanel(){
+  var el=document.getElementById("draftsPanel"); if(!el)return;
+  var drafts=_getDrafts();
+  if(!drafts.length){ el.innerHTML='<div style="padding:12px;color:#9ca3af;font-size:13px">Inga sparade utkast ännu.</div>'; return; }
+  el.innerHTML=drafts.map(function(d){ var w=new Date(d.ts); var wl=w.toLocaleDateString("sv-SE")+" "+w.toLocaleTimeString("sv-SE").slice(0,5); var title=(d.title||"(utan titel)").replace(/</g,"&lt;"); return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #f2f2f2"><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+title+'</div><div style="font-size:11px;color:#9ca3af">'+wl+" · "+((d.channels||[]).length)+' kanaler</div></div><button class="dft-open" data-id="'+d.id+'" style="font-size:12px;font-weight:600;padding:5px 10px;border-radius:6px;border:none;background:var(--m);color:#fff;cursor:pointer">Öppna</button><button class="dft-del" data-id="'+d.id+'" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #e5e7eb;background:#fff;color:#b31e59;cursor:pointer">Ta bort</button></div>'; }).join("");
+  [].slice.call(el.querySelectorAll(".dft-open")).forEach(function(b){ b.onclick=function(){ openDraft(b.dataset.id); }; });
+  [].slice.call(el.querySelectorAll(".dft-del")).forEach(function(b){ b.onclick=function(){ deleteDraft(b.dataset.id); }; });
+}
+function toggleDrafts(){ var el=document.getElementById("draftsPanel"); if(!el)return; var show=(el.style.display==="none"||!el.style.display); el.style.display=show?"block":"none"; if(show)renderDraftsPanel(); }
 async function generateFromPost(){var title=(document.getElementById("m-title").value||"").trim();var content=(document.getElementById("m-content").value||"").trim();var channels=[...document.querySelectorAll("#manualChGrid .ch-pill.active")].map(function(t){return t.dataset.ch;});if(!channels.length){if(typeof showToast==="function")showToast("Välj minst en kanal först");return;}var brief=((title?("Titel: "+title+". "):"")+(content?("Innehåll: "+content):"")).trim();if(!brief){if(typeof showToast==="function")showToast("Fyll i titel eller innehåll först");return;}var btn=document.getElementById("genFromPostBtn");if(btn){btn.disabled=true;btn.dataset.ot=btn.textContent;btn.textContent="✨ Genererar...";}try{var brand=(typeof getBrandProfile==="function")?getBrandProfile():undefined;var res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({brief:brief,channels:channels,brand:brand})});var data=await res.json();if(!res.ok)throw new Error(data.error||"API-fel");var hasAny=channels.some(function(ch){return (data.proposals[ch]||[]).length>0;});if(hasAny){S.manualChannels=channels;S.manualChannel=channels[0];S._lastBrief=brief;renderMultiChannelProposals(data.proposals,channels);if(!S._uploadedImageUrl)generateBrandImage(brief);if(typeof showToast==="function")showToast("✨ Förslag klara!");}else{if(typeof showToast==="function")showToast("Inga förslag genererades. Försök igen.");}}catch(e){if(typeof showToast==="function")showToast("Fel: "+e.message);}if(btn){btn.disabled=false;btn.textContent=btn.dataset.ot||"✨ Generera med AI";}}
 async function generateAndFill() {
   const brief = document.getElementById('briefInput').value.trim();
