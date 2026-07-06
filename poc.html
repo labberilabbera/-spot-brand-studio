@@ -591,7 +591,7 @@ textarea.field-input{resize:none;line-height:1.5}
           </div>
         </div>
 
-        <button class="add-review-btn" onclick="addManualToReview()">+ Lägg till granskning</button><div style="display:flex;gap:8px;margin-top:10px"><button onclick="saveDraft()" style="flex:1;font-size:13px;color:#374151;font-weight:600;padding:10px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer">💾 Spara utkast</button><button onclick="toggleDrafts()" style="flex:1;font-size:13px;color:#374151;font-weight:600;padding:10px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer">📝 Utkast</button></div><div id="draftsPanel" style="display:none;margin-top:8px;background:#fff;border:1px solid #eee;border-radius:10px;max-height:240px;overflow-y:auto"></div>
+        <button class="add-review-btn" onclick="addManualToReview();resetCreateForm()">+ Lägg till granskning</button><div style="display:flex;gap:8px;margin-top:10px"><button onclick="saveDraft()" style="flex:1;font-size:13px;color:#374151;font-weight:600;padding:10px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer">💾 Spara utkast</button><button onclick="toggleDrafts()" style="flex:1;font-size:13px;color:#374151;font-weight:600;padding:10px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer">📝 Utkast</button></div><div id="draftsPanel" style="display:none;margin-top:8px;background:#fff;border:1px solid #eee;border-radius:10px;max-height:240px;overflow-y:auto"></div>
 
         <!-- AI ASSIST MODAL -->
         <div id="aiAssistModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:center;justify-content:center">
@@ -1709,6 +1709,17 @@ function getBrandProfile() {
 }
 function _getDrafts(){ try{return JSON.parse(localStorage.getItem("spotDrafts")||"[]");}catch(e){return [];} }
 function _setDrafts(a){ try{localStorage.setItem("spotDrafts",JSON.stringify(a));}catch(e){} }
+function resetCreateForm(){
+  var t=document.getElementById("m-title"); if(t)t.value="";
+  var c=document.getElementById("m-content"); if(c)c.value="";
+  window._allChannelProposals=null; window._selectedProposalPerChannel=null;
+  if(typeof S!=="undefined"){ S._aiImageUrl=null; S._imgPos=null; S._uploadedImageUrl=null; S._lastBrief=null; S._aiImageBrief=null; }
+  var pb=document.getElementById("prevBody"); if(pb)pb.innerHTML='<div style="padding:40px 20px;text-align:center;color:#9ca3af;font-size:14px">Fyll i titel och innehåll, välj kanaler och tryck Generera med AI.</div>';
+  var pt=document.getElementById("prevTabs"); if(pt)pt.innerHTML="";
+  var f=document.getElementById("imgRepoFrame"); if(f)f.style.display="none";
+  var ec=document.getElementById("imgEditControls"); if(ec)ec.style.display="none";
+  var rb=document.getElementById("regenImgBtn"); if(rb)rb.style.display="none";
+}
 function saveDraft(){
   var t=document.getElementById("m-title"), c=document.getElementById("m-content");
   var title=t?t.value:"", content=c?c.value:"";
@@ -1717,7 +1728,7 @@ function saveDraft(){
   var drafts=_getDrafts();
   drafts.unshift({ id:"d"+Date.now(), ts:Date.now(), title:title, content:content, channels:channels, proposals:(window._allChannelProposals||null), selected:(window._selectedProposalPerChannel||null), aiImageUrl:(S._aiImageUrl||null), imgPos:(S._imgPos||null), uploaded:(S._uploadedImageUrl||null) });
   if(drafts.length>50)drafts=drafts.slice(0,50);
-  _setDrafts(drafts); showToast("💾 Utkast sparat!");
+  _setDrafts(drafts); showToast("💾 Utkast sparat!"); resetCreateForm();
   var el=document.getElementById("draftsPanel"); if(el&&el.style.display!=="none")renderDraftsPanel();
 }
 function deleteDraft(id){ _setDrafts(_getDrafts().filter(function(x){return x.id!==id;})); renderDraftsPanel(); }
@@ -1729,19 +1740,20 @@ function openDraft(id){
     var c=document.getElementById("m-content"); if(c)c.value=dft.content||"";
     [].slice.call(document.querySelectorAll("#manualChGrid .ch-pill")).forEach(function(p){ p.classList.toggle("active",(dft.channels||[]).indexOf(p.dataset.ch)>=0); });
     if(dft.proposals){ window._allChannelProposals=dft.proposals; if(dft.selected)window._selectedProposalPerChannel=dft.selected; S._aiImageUrl=dft.aiImageUrl||null; S._imgPos=dft.imgPos||null; S._uploadedImageUrl=dft.uploaded||null; var chs=Object.keys(dft.proposals); if(chs.length&&typeof renderMultiChannelProposals==="function")renderMultiChannelProposals(dft.proposals,(dft.channels&&dft.channels.length)?dft.channels:chs); }
-    var pnl=document.getElementById("draftsPanel"); if(pnl)pnl.style.display="none";
+    var pnl=document.getElementById("draftsPanel"); if(pnl)pnl.style.display="none"; var bd=document.getElementById("draftsBackdrop"); if(bd)bd.remove();
     showToast("Utkast öppnat");
   },150);
 }
 function renderDraftsPanel(){
   var el=document.getElementById("draftsPanel"); if(!el)return;
+  var DRAFTHEADER='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #eee;position:sticky;top:0;background:#fff"><b style="font-size:15px">📝 Dina utkast</b><button onclick="toggleDrafts()" style="border:none;background:none;font-size:22px;cursor:pointer;color:#666;line-height:1;padding:0 4px">×</button></div>';
   var drafts=_getDrafts();
-  if(!drafts.length){ el.innerHTML='<div style="padding:12px;color:#9ca3af;font-size:13px">Inga sparade utkast ännu.</div>'; return; }
-  el.innerHTML=drafts.map(function(d){ var w=new Date(d.ts); var wl=w.toLocaleDateString("sv-SE")+" "+w.toLocaleTimeString("sv-SE").slice(0,5); var title=(d.title||"(utan titel)").replace(/</g,"&lt;"); return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #f2f2f2"><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+title+'</div><div style="font-size:11px;color:#9ca3af">'+wl+" · "+((d.channels||[]).length)+' kanaler</div></div><button class="dft-open" data-id="'+d.id+'" style="font-size:12px;font-weight:600;padding:5px 10px;border-radius:6px;border:none;background:var(--m);color:#fff;cursor:pointer">Öppna</button><button class="dft-del" data-id="'+d.id+'" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #e5e7eb;background:#fff;color:#b31e59;cursor:pointer">Ta bort</button></div>'; }).join("");
+  if(!drafts.length){ el.innerHTML=DRAFTHEADER+'<div style="padding:16px;color:#9ca3af;font-size:13px">Inga sparade utkast ännu.</div>'; return; }
+  el.innerHTML=DRAFTHEADER+drafts.map(function(d){ var w=new Date(d.ts); var wl=w.toLocaleDateString("sv-SE")+" "+w.toLocaleTimeString("sv-SE").slice(0,5); var title=(d.title||"(utan titel)").replace(/</g,"&lt;"); return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #f2f2f2"><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+title+'</div><div style="font-size:11px;color:#9ca3af">'+wl+" · "+((d.channels||[]).length)+' kanaler</div></div><button class="dft-open" data-id="'+d.id+'" style="font-size:12px;font-weight:600;padding:5px 10px;border-radius:6px;border:none;background:var(--m);color:#fff;cursor:pointer">Öppna</button><button class="dft-del" data-id="'+d.id+'" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #e5e7eb;background:#fff;color:#b31e59;cursor:pointer">Ta bort</button></div>'; }).join("");
   [].slice.call(el.querySelectorAll(".dft-open")).forEach(function(b){ b.onclick=function(){ openDraft(b.dataset.id); }; });
   [].slice.call(el.querySelectorAll(".dft-del")).forEach(function(b){ b.onclick=function(){ deleteDraft(b.dataset.id); }; });
 }
-function toggleDrafts(){ var el=document.getElementById("draftsPanel"); if(!el)return; var show=(el.style.display==="none"||!el.style.display); el.style.display=show?"block":"none"; if(show)renderDraftsPanel(); }
+function toggleDrafts(){ var el=document.getElementById("draftsPanel"); if(!el)return; var open=el.style.display==="block"; var bd=document.getElementById("draftsBackdrop"); if(open){ el.style.display="none"; if(bd)bd.remove(); return; } if(!bd){ bd=document.createElement("div"); bd.id="draftsBackdrop"; bd.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99998"; bd.onclick=function(){ el.style.display="none"; bd.remove(); }; document.body.appendChild(bd); } el.style.cssText="display:block;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(440px,92vw);max-height:75vh;overflow-y:auto;background:#fff;border:1px solid #eee;border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.35);z-index:99999"; document.body.appendChild(el); renderDraftsPanel(); }
 async function generateFromPost(){var title=(document.getElementById("m-title").value||"").trim();var content=(document.getElementById("m-content").value||"").trim();var channels=[...document.querySelectorAll("#manualChGrid .ch-pill.active")].map(function(t){return t.dataset.ch;});if(!channels.length){if(typeof showToast==="function")showToast("Välj minst en kanal först");return;}var brief=((title?("Titel: "+title+". "):"")+(content?("Innehåll: "+content):"")).trim();if(!brief){if(typeof showToast==="function")showToast("Fyll i titel eller innehåll först");return;}var btn=document.getElementById("genFromPostBtn");if(btn){btn.disabled=true;btn.dataset.ot=btn.textContent;btn.textContent="✨ Genererar...";}try{var brand=(typeof getBrandProfile==="function")?getBrandProfile():undefined;var res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({brief:brief,channels:channels,brand:brand})});var data=await res.json();if(!res.ok)throw new Error(data.error||"API-fel");var hasAny=channels.some(function(ch){return (data.proposals[ch]||[]).length>0;});if(hasAny){S.manualChannels=channels;S.manualChannel=channels[0];S._lastBrief=brief;renderMultiChannelProposals(data.proposals,channels);if(!S._uploadedImageUrl)generateBrandImage(brief);if(typeof showToast==="function")showToast("✨ Förslag klara!");}else{if(typeof showToast==="function")showToast("Inga förslag genererades. Försök igen.");}}catch(e){if(typeof showToast==="function")showToast("Fel: "+e.message);}if(btn){btn.disabled=false;btn.textContent=btn.dataset.ot||"✨ Generera med AI";}}
 async function generateAndFill() {
   const brief = document.getElementById('briefInput').value.trim();
