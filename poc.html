@@ -1720,6 +1720,31 @@ function resetCreateForm(){
   var ec=document.getElementById("imgEditControls"); if(ec)ec.style.display="none";
   var rb=document.getElementById("regenImgBtn"); if(rb)rb.style.display="none";
 }
+function rejectPost(id){
+  var post=(S.reviewQueue||[]).find(function(p){return p.id===id;});
+  if(!post){ if(typeof showToast==="function")showToast("Hittar inte inlägget."); return; }
+  var ov=document.createElement("div");
+  ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px";
+  var box=document.createElement("div");
+  box.style.cssText="background:#fff;border-radius:16px;width:min(460px,94vw);padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.4)";
+  box.innerHTML='<div style="font-size:18px;font-weight:700;margin-bottom:6px">Neka inlägg</div><div style="font-size:13px;color:#6b7280;margin-bottom:14px">Skriv varför inlägget nekas. Skaparen får det som ett utkast att justera.</div><textarea id="rejectReason" placeholder="Orsak till nekande..." style="width:100%;min-height:110px;border:1.5px solid #e5e7eb;border-radius:10px;padding:10px;font-size:14px;font-family:inherit;resize:vertical;outline:none"></textarea><div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end"><button id="rejectCancel" style="padding:10px 16px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;font-weight:600;cursor:pointer">Avbryt</button><button id="rejectConfirm" style="padding:10px 16px;border-radius:10px;border:none;background:#b31e59;color:#fff;font-weight:600;cursor:pointer">⨯ Neka inlägg</button></div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+  var ta=box.querySelector("#rejectReason"); ta.focus();
+  box.querySelector("#rejectCancel").onclick=function(){ ov.remove(); };
+  ov.onclick=function(e){ if(e.target===ov)ov.remove(); };
+  box.querySelector("#rejectConfirm").onclick=function(){
+    var reason=ta.value.trim();
+    if(!reason){ ta.style.borderColor="#b31e59"; ta.focus(); return; }
+    var drafts=(function(){try{return JSON.parse(localStorage.getItem("spotDrafts")||"[]");}catch(e){return [];}})();
+    drafts.unshift({ id:"d"+Date.now(), ts:Date.now(), title:"🚫 NEKAD – "+(post.title||"(inlägg)"), content:"[Nekad. Orsak: "+reason+"]\n\n"+(post.content||""), channels:(post.channels||(post.channel?[post.channel]:[])), proposals:null, selected:null, aiImageUrl:(post.imageUrl||post.aiImageUrl||null), imgPos:(post.imgPos||null), uploaded:null, rejected:true, rejectedReason:reason });
+    try{localStorage.setItem("spotDrafts",JSON.stringify(drafts));}catch(e){}
+    S.reviewQueue=(S.reviewQueue||[]).filter(function(p){return p.id!==id;});
+    if(S.selectedReviewId===id)S.selectedReviewId=(S.reviewQueue[0]?S.reviewQueue[0].id:null);
+    ov.remove();
+    if(typeof renderReview==="function")renderReview();
+    if(typeof showToast==="function")showToast("Inlägget nekades och skickades till utkast.");
+  };
+}
 function saveDraft(){
   var t=document.getElementById("m-title"), c=document.getElementById("m-content");
   var title=t?t.value:"", content=c?c.value:"";
@@ -2151,7 +2176,7 @@ function renderDetailPanel() {
       <div class="dp-footer" style="flex-direction:column;gap:8px">
         <div style="display:flex;gap:8px;width:100%">
           <button class="edit-btn" style="flex:1" onclick="openEditorModal(S.reviewQueue.find(p=>p.id===S.selectedReviewId))">✏️ Redigera</button>
-          <button class="approve-btn" style="flex:1" onclick="approvePost('${post.id}', false)">✅ Publicera nu</button>
+          <button class="approve-btn" style="flex:1" onclick="approvePost('${post.id}', false)">✅ Publicera nu</button><button class="reject-btn" style="flex:1;background:#fff;border:1.5px solid #b31e59;color:#b31e59;border-radius:8px;font-weight:600;padding:10px;cursor:pointer" onclick="rejectPost('${post.id}')">⨯ Neka</button>
         </div>
         <button onclick="approvePost('${post.id}', true)" style="width:100%;padding:11px;border-radius:10px;background:#eff6ff;border:1.5px solid #3b82f6;color:#2563eb;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">📅 Godkänn och schemalägg</button>
       </div>
