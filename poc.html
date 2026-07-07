@@ -415,7 +415,7 @@ textarea.field-input{resize:none;line-height:1.5}
       <div class="tb-avatar" id="avatarBtn" onclick="togglePubDropdown()">A
         <div class="pub-badge" id="pubBadge"></div>
       </div>
-      <div class="pub-dropdown" id="pubDropdown">
+      <div class="pub-dropdown" id="pubDropdown"><div class="pd-header">Mina kanaler (snabbdelning)</div><div id="myChannels"><div class="pd-empty">Inga kanaler tillagda</div></div><div style="padding:8px 14px;display:flex;gap:6px;border-bottom:1px solid #f0f0f0"><select id="mcPlatform" style="font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px"><option value="instagram">📷 IG</option><option value="linkedin">💼 LI</option><option value="facebook">👥 FB</option><option value="tiktok">🎵 TT</option></select><input id="mcHandle" placeholder="@namn eller länk" style="flex:1;min-width:0;font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px 8px"><button onclick="addMyChannel()" style="font-size:14px;font-weight:700;padding:5px 12px;border-radius:6px;border:none;background:var(--m);color:#fff;cursor:pointer">+</button></div>
         <div class="pd-header">Publicerade inlägg</div>
         <div id="pubList"><div class="pd-empty">Inga publicerade inlägg ännu</div></div>
       </div>
@@ -1746,6 +1746,13 @@ function rejectPost(id){
   };
 }
 (function(){function _arFor(ch){return ({instagram:"4/5",tiktok:"9/16",facebook:"1/1",linkedin:"1/1"})[ch]||"4/5";}function _syncAR(){try{var ch=window._activeProposalTab||(typeof S!=="undefined"&&S.previewChannel)||(typeof S!=="undefined"&&S.manualChannel)||"instagram";document.documentElement.style.setProperty("--post-ar",_arFor(ch));}catch(e){}}setInterval(_syncAR,400);document.addEventListener("DOMContentLoaded",_syncAR);})();
+function _getMyCh(){ try{return JSON.parse(localStorage.getItem("spotMyChannels")||"[]");}catch(e){return [];} }
+function _setMyCh(a){ try{localStorage.setItem("spotMyChannels",JSON.stringify(a));}catch(e){} }
+function addMyChannel(){ var p=document.getElementById("mcPlatform"), h=document.getElementById("mcHandle"); if(!p||!h)return; var handle=(h.value||"").trim(); if(!handle){h.focus();return;} var a=_getMyCh(); a.push({platform:p.value, handle:handle}); _setMyCh(a); h.value=""; renderMyChannels(); if(typeof showToast==="function")showToast("Kanal tillagd"); }
+function removeMyChannel(i){ var a=_getMyCh(); a.splice(i,1); _setMyCh(a); renderMyChannels(); }
+function _mcUrl(ch){ var h=ch.handle||""; if(h.slice(0,4)==="http") return h; var u=(h.charAt(0)==="@")?h.slice(1):h; var base={instagram:"https://instagram.com/",linkedin:"https://linkedin.com/in/",facebook:"https://facebook.com/",tiktok:"https://tiktok.com/@"}[ch.platform]||"https://"; return base+u; }
+function renderMyChannels(){ var el=document.getElementById("myChannels"); if(!el)return; var a=_getMyCh(); var ic={instagram:"📷",linkedin:"💼",facebook:"👥",tiktok:"🎵"}; if(!a.length){ el.innerHTML='<div class="pd-empty">Inga kanaler tillagda</div>'; return; } el.innerHTML=a.map(function(ch,i){ return '<div style="display:flex;align-items:center;gap:8px;padding:6px 14px"><span>'+(ic[ch.platform]||"🔗")+'</span><span style="flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+String(ch.handle).split("<").join("&lt;")+'</span><a href="'+_mcUrl(ch)+'" target="_blank" rel="noopener" style="font-size:12px;color:var(--m);font-weight:600;text-decoration:none">Dela</a><button class="mc-del" data-i="'+i+'" style="border:none;background:none;color:#b31e59;cursor:pointer;font-size:15px;line-height:1">×</button></div>'; }).join(""); [].slice.call(el.querySelectorAll(".mc-del")).forEach(function(b){ b.onclick=function(){ removeMyChannel(+b.dataset.i); }; }); }
+document.addEventListener("DOMContentLoaded", renderMyChannels); setTimeout(function(){try{renderMyChannels();}catch(e){}}, 800);
 function saveDraft(){
   var t=document.getElementById("m-title"), c=document.getElementById("m-content");
   var title=t?t.value:"", content=c?c.value:"";
