@@ -4,25 +4,86 @@ const path = require('path')
 const fs = require('fs')
 const crypto = require('crypto')
 const app = express()
+
 const PORT = process.env.PORT || 3000
 const UNAME = process.env.APP_USERNAME || 'Spot'
 const UPASS = process.env.APP_PASSWORD || '1234'
 const sessions = {}
+
 app.use(express.json({ limit: '20mb' }))
 app.use(express.urlencoded({ extended: true }))
-const _TPL = { 'tpl-studio.png': '4.png', 'tpl-case-hallanning.png': '5.png', 'tpl-case-gardsstyling.png': '7.png', 'tpl-louisiana.png': '6.png' }
-app.get('/assets/:f', (req, res) => { const f = _TPL[req.params.f] || req.params.f; if (f.indexOf('..') !== -1 || f.indexOf('/') !== -1) return res.status(400).end(); const p = path.join(__dirname, 'assets', f); if (fs.existsSync(p)) return res.sendFile(p); res.status(404).end() })
-function makeToken() { return crypto.randomBytes(32).toString('hex') }
+
+const _TPL = { 
+  'tpl-studio.png': '4.png', 
+  'tpl-case-hallanning.png': '5.png', 
+  'tpl-case-gardsstyling.png': '7.png', 
+  'tpl-louisiana.png': '6.png' 
+}
+
+app.get('/assets/:f', (req, res) => { 
+  const f = _TPL[req.params.f] || req.params.f; 
+  if (f.indexOf('..') !== -1 || f.indexOf('/') !== -1) return res.status(400).end(); 
+  const p = path.join(__dirname, 'assets', f); 
+  if (fs.existsSync(p)) return res.sendFile(p); 
+  res.status(404).end() 
+})
+
+function makeToken() { 
+  return crypto.randomBytes(32).toString('hex') 
+}
+
 function getToken(req) { const c = req.headers.cookie || ''; const p = c.split(';').map(x => x.trim()).find(x => x.startsWith('spot_session=')); return p ? p.split('=')[1] : null }
 function auth(req, res, next) { if (sessions[getToken(req)]) return next(); if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorized' }); res.redirect('/login') }
+
 app.get('/login', (_req, res) => res.send(LOGIN_HTML))
-app.post('/login', (req, res) => { const { username, password } = req.body; if (username === UNAME && password === UPASS) { const t = makeToken(); sessions[t] = { u: username }; res.setHeader('Set-Cookie', 'spot_session=' + t + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + (60*60*24*7)); return res.redirect('/') } res.redirect('/login?err=1') })
-app.post('/logout', (req, res) => { delete sessions[getToken(req)]; res.setHeader('Set-Cookie', 'spot_session=; Path=/; Max-Age=0'); res.json({ ok: true }) })
-app.get('/inject.js', (_req, res) => { try { res.setHeader('Content-Type', 'application/javascript'); res.send(fs.readFileSync(path.join(__dirname, 'inject.js'), 'utf-8')) } catch (e) { res.send('// inject.js not found') } })
-app.get('/', auth, (req, res) => { try { const html = fs.readFileSync(path.join(__dirname, 'poc.html'), 'utf-8'); const tag = '<script src="/inject.js"></script>'; const idx = html.lastIndexOf('</script>'); const patched = html.slice(0, idx + 9) + tag + html.slice(idx + 9); res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(patched) } catch (e) { res.status(500).send('Error: ' + e.message) } })
-app.post('/api/generate', auth, async (req, res) => { try { const { channels = ['instagram'], brief = '' } = req.body; const apiKey = process.env.GEMINI_API_KEY; if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY saknas' }); const chList = Array.isArray(channels) ? channels : [channels]; const prompt = 'Du ar copywriter for spot. creative studio Halmstad. Brief: ' + (brief || 'Generellt om spot.') + '. Kanaler: ' + chList.join(', ') + '. Generera EXAKT 3 korta forslag max 100 ord. Svara ENDAST med JSON-array: [{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."}]'; const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=' + apiKey, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.9, maxOutputTokens: 8192 } }) }); const data = await r.json(); if (data.error) throw new Error('Gemini: ' + data.error.message); let s = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').replace(/```json/g, '').replace(/```/g, '').trim(); s = s.replace(/,(\s*[}\]])/g, '$1'); const start = s.indexOf('['), end = s.lastIndexOf(']'); if (start < 0 || end < 0) throw new Error('Ingen array i svar'); const flat = JSON.parse(s.slice(start, end + 1)); const proposals = {}; chList.forEach(ch => { proposals[ch] = flat }); res.json({ proposals }) } catch (e) { res.status(500).json({ error: e.message }) } })
-app.post('/api/generate-image', auth, async (req, res) => { try { const { brief = '', style = 'modern' } = req.body; const apiKey = process.env.GEMINI_API_KEY; if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY saknas' }); const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=' + apiKey, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: 'CRITICAL RULE: absolutely NO text, no letters, no words, no numbers, no captions, no logos and no typography anywhere in the image - it must be a purely visual photo with zero written characters. Professional social media image spot. creative studio Halmstad. Style: ' + style + '. Brief: ' + (brief || 'creative studio') + '.' }] }], generationConfig: { responseModalities: ['IMAGE', 'TEXT'] } }) }); const data = await r.json(); if (data.error) throw new Error('Gemini: ' + data.error.message); const imgPart = (data.candidates?.[0]?.content?.parts || []).find(p => p.inlineData?.mimeType?.startsWith('image/')); if (imgPart) return res.json({ imageUrl: 'data:' + imgPart.inlineData.mimeType + ';base64,' + imgPart.inlineData.data }); res.json({ imageUrl: 'https://placehold.co/1080x1080/c8003c/ffffff?text=spot.' }) } catch (e) { res.status(500).json({ error: e.message }) } })
-app.post('/api/save-post', auth, async (req, res) => { try { const { Pool } = require('pg'); const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }); await pool.query('CREATE TABLE IF NOT EXISTS posts (id TEXT PRIMARY KEY, data JSONB, created_at TIMESTAMPTZ DEFAULT NOW())'); const post = req.body; await pool.query('INSERT INTO posts (id,data) VALUES ($1,$2) ON CONFLICT (id) DO UPDATE SET data=$2,created_at=NOW()', [post.id || Date.now().toString(), JSON.stringify(post)]); res.json({ saved: true }) } catch (e) { res.status(500).json({ error: e.message }) } })
-app.get('/api/published-posts', auth, async (req, res) => { try { const { Pool } = require('pg'); const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }); await pool.query('CREATE TABLE IF NOT EXISTS posts (id TEXT PRIMARY KEY, data JSONB, created_at TIMESTAMPTZ DEFAULT NOW())'); const result = await pool.query("SELECT data FROM posts WHERE data->>'status' IN ('published','archived') ORDER BY created_at DESC LIMIT 200"); res.json({ posts: result.rows.map(r => r.data) }) } catch (e) { res.status(500).json({ error: e.message }) } })
-app.listen(PORT, () => console.log('spot. running on ' + PORT))
-const LOGIN_HTML = '<!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"/><title>spot.</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Segoe UI,sans-serif;background:#0f0f0f;min-height:100vh;display:flex;align-items:center;justify-content:center}.c{background:#fff;border-radius:20px;padding:40px 36px;width:min(380px,92vw);box-shadow:0 24px 60px rgba(0,0,0,.4)}.logo{font-size:28px;font-weight:800;color:#b31e59;margin-bottom:4px}.tag{font-size:13px;color:#9ca3af;margin-bottom:32px}.f{margin-bottom:16px}label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px}input{width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:15px;outline:none;font-family:inherit}input:focus{border-color:#b31e59}.err{color:#b31e59;font-size:13px;margin-top:8px;display:none}.err.show{display:block}button{width:100%;margin-top:8px;padding:13px;background:#b31e59;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}</style></head><body><div class="c"><div class="logo">spot.</div><div class="tag">content studio</div><form method="POST" action="/login"><div class="f"><label>Användarnamn</label><input type="text" name="username" autofocus/></div><div class="f"><label>Lösenord</label><input type="password" name="password"/></div><div class="err" id="err">Fel.</div><button type="submit">Logga in</button><div style="text-align:center;margin-top:16px"><span onclick="var m=document.getElementById('fpm');m.style.display=(m.style.display==='none'?'block':'none')" style="font-size:13px;color:#b31e59;cursor:pointer;text-decoration:underline">Glömt lösenord?</span></div><div id="fpm" style="display:none;margin-top:12px;padding:12px;background:#fff5f7;border:1px solid #f0d0dd;border-radius:10px;font-size:13px;color:#555;text-align:center;line-height:1.5">Kontakta din administratör på <b>admin@spot.se</b> så återställer vi ditt lösenord åt dig.</div></form></div><script>if(new URLSearchParams(location.search).get("err"))document.getElementById("err").classList.add("show")<\/script></body></html>'
+
+app.post('/login', (req, res) => { 
+  const { username, password } = req.body; 
+  if (username === UNAME && password === UPASS) { 
+    const t = makeToken(); 
+    sessions[t] = { u: username }; 
+    res.setHeader('Set-Cookie', 'spot_session=' + t + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + (60*60*24*7)); 
+    return res.redirect('/') 
+  } 
+  res.redirect('/login?err=1') 
+})
+
+app.post('/logout', (req, res) => { 
+  delete sessions[getToken(req)]; 
+  res.setHeader('Set-Cookie', 'spot_session=; Path=/; Max-Age=0'); 
+  res.json({ ok: true }) 
+})
+
+app.get('/inject.js', (_req, res) => { 
+  try { 
+    res.setHeader('Content-Type', 'application/javascript'); 
+    res.send(fs.readFileSync(path.join(__dirname, 'inject.js'), 'utf-8')) 
+  } catch (e) { 
+    res.send('// inject.js not found') 
+  } 
+})
+
+app.get('/', auth, (req, res) => { 
+  try { 
+    const html = fs.readFileSync(path.join(__dirname, 'poc.html'), 'utf-8'); 
+    const tag = '<script src="/inject.js"></script>'; 
+    const idx = html.lastIndexOf('</script>'); 
+    const patched = html.slice(0, idx + 9) + tag + html.slice(idx + 9); 
+    res.setHeader('Content-Type', 'text/html; charset=utf-8'); 
+    res.send(patched) 
+  } catch (e) { 
+    res.status(500).send('Error: ' + e.message) 
+  } 
+})
+
+app.post('/api/generate', auth, async (req, res) => { 
+  try { 
+    const { channels = ['instagram'], brief = '' } = req.body; 
+    const apiKey = process.env.GEMINI_API_KEY; 
+    if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY saknas' }); 
+    const chList = Array.isArray(channels) ? channels : [channels]; 
+    const prompt = 'Du ar copywriter for spot. creative studio Halmstad. Brief: ' + (brief || 'Generellt om spot.') + '. Kanaler: ' + chList.join(', ') + '. Generera EXAKT 3 korta forslag max 100 ord. Svara ENDAST med JSON-array: [{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."},{"title":"...","content":"...","hashtags":["..."],"cta":"..."}]'; 
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=' + apiKey, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.9, maxOutputTokens: 8192 } }) }); 
+    const data = await r.json(); 
+    if (data.error) throw new Error('Gemini: ' + data.error.message); 
+    let s = (data.candidates?.[0]?.content
