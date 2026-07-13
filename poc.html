@@ -898,6 +898,8 @@ const S = {
   _aiImageBrief: '',       // briefen som bilden genererades för
   pubTab: 'active',        // 'active' | 'archive' i Publicerade-vyn
 };
+(function(){ try{ var _as=JSON.parse(localStorage.getItem('spotAppState')||'null'); if(_as){ if(Array.isArray(_as.reviewQueue))S.reviewQueue=_as.reviewQueue; if(Array.isArray(_as.publishedPosts))S.publishedPosts=_as.publishedPosts; if(_as.archiveOverride)S.archiveOverride=_as.archiveOverride; } }catch(e){} })();
+function _saveAppState(){ try{ localStorage.setItem('spotAppState', JSON.stringify({reviewQueue:S.reviewQueue, publishedPosts:S.publishedPosts, archiveOverride:S.archiveOverride})); }catch(e){} }
 // Aktiv bild: uppladdad har företräde, annars AI-genererad
 function activeImageUrl() { return S._uploadedImageUrl || S._aiImageUrl || null; }
 
@@ -1377,6 +1379,7 @@ function paintDashBtns(){document.querySelectorAll(".dp-btn").forEach(function(b
 function setDashPeriod(p){S.dashPeriod=p;S.dashFrom=null;S.dashTo=null;var f=document.getElementById("dpFrom"),t=document.getElementById("dpTo");if(f)f.value="";if(t)t.value="";renderDashboard();}
 function setDashRange(){var f=document.getElementById("dpFrom").value,t=document.getElementById("dpTo").value;S.dashFrom=f||null;S.dashTo=t||null;if(S.dashFrom||S.dashTo)S.dashPeriod=null;renderDashboard();}
 function renderDashboard() {
+  _saveAppState();
   if (S.dashPeriod === undefined) S.dashPeriod = "all";
   paintDashBtns();
   const rq = S.reviewQueue.filter(dashInPeriod);
@@ -2098,6 +2101,7 @@ function addManualToReview() {
 //  REVIEW
 // ════════════════════════════════════════════════════════
 function updateBadge() {
+  _saveAppState();
   const badge = document.getElementById('reviewBadge');
   badge.style.display = S.reviewQueue.length > 0 ? 'inline-flex' : 'none';
   badge.textContent = S.reviewQueue.length;
