@@ -418,6 +418,7 @@ textarea.field-input{resize:none;line-height:1.5}
       <div class="pub-dropdown" id="pubDropdown"><div class="pd-header">Mina kanaler (snabbdelning)</div><div id="myChannels"><div class="pd-empty">Inga kanaler tillagda</div></div><div style="padding:8px 14px;display:flex;gap:6px;border-bottom:1px solid #f0f0f0"><select id="mcPlatform" style="font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px"><option value="instagram">📷 IG</option><option value="linkedin">💼 LI</option><option value="facebook">👥 FB</option><option value="tiktok">🎵 TT</option></select><input id="mcHandle" placeholder="@namn eller länk" style="flex:1;min-width:0;font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px 8px"><button onclick="addMyChannel()" style="font-size:14px;font-weight:700;padding:5px 12px;border-radius:6px;border:none;background:var(--m);color:#fff;cursor:pointer">+</button></div>
         <div class="pd-header">Publicerade inlägg</div>
         <div id="pubList"><div class="pd-empty">Inga publicerade inlägg ännu</div></div>
+        <div style="border-top:1px solid #f0f0f0;padding:10px 14px"><button onclick="openChangePwModal()" style="width:100%;text-align:left;background:none;border:none;font-size:13px;color:#374151;cursor:pointer;padding:4px 0">🔒 Byt lösenord</button></div>
       </div>
     </div>
   </div>
@@ -778,6 +779,24 @@ textarea.field-input{resize:none;line-height:1.5}
 </div>
 
 <!-- SHARE MODAL -->
+<div id="changePwModal" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300;display:none;align-items:center;justify-content:center" onclick="if(event.target===this)closeChangePwModal()">
+  <div style="background:#fff;border-radius:20px;width:min(380px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden">
+    <div style="padding:18px 20px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:15px;font-weight:700;color:#111">Byt lösenord</div>
+      <button onclick="closeChangePwModal()" style="font-size:18px;color:#9ca3af;line-height:1;padding:2px 6px">×</button>
+    </div>
+    <div style="padding:16px 20px">
+      <div style="margin-bottom:12px"><label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Nuvarande lösenord</label><input id="cpwCurrent" type="password" style="width:100%;padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:14px"/></div>
+      <div style="margin-bottom:6px"><label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Nytt lösenord</label><input id="cpwNew" type="password" style="width:100%;padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:14px"/></div>
+      <div id="cpwMsg" style="font-size:12px;margin-top:8px;display:none"></div>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid #f3f4f6;display:flex;gap:8px">
+      <button onclick="closeChangePwModal()" style="flex:1;padding:10px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:13px;font-weight:500;color:#374151;cursor:pointer">Avbryt</button>
+      <button onclick="submitChangePw()" style="flex:1;padding:10px;background:var(--m);color:#fff;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer">Spara</button>
+    </div>
+  </div>
+</div>
+
 <div id="shareModal" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300;display:none;align-items:center;justify-content:center" onclick="if(event.target===this)closeShareModal()">
   <div style="background:#fff;border-radius:20px;width:min(480px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden">
     <div style="padding:18px 20px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between">
@@ -2998,6 +3017,20 @@ function openShareModal(idx, posts) {
     </button>`).join('');
 
   document.getElementById('shareModal').style.display = 'flex';
+}
+function openChangePwModal(){ document.getElementById('changePwModal').style.display='flex'; document.getElementById('cpwCurrent').value=''; document.getElementById('cpwNew').value=''; var m=document.getElementById('cpwMsg'); m.style.display='none'; togglePubDropdown(); }
+function closeChangePwModal(){ document.getElementById('changePwModal').style.display='none'; }
+function submitChangePw(){
+  var cur=document.getElementById('cpwCurrent').value, nw=document.getElementById('cpwNew').value;
+  var m=document.getElementById('cpwMsg');
+  if(!nw||nw.length<4){ m.textContent='Nytt lösenord måste vara minst 4 tecken.'; m.style.color='#b31e59'; m.style.display='block'; return; }
+  fetch('/api/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:cur,newPassword:nw})})
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, data:d}; }); })
+    .then(function(res){
+      if(res.ok){ m.textContent='Lösenordet är ändrat!'; m.style.color='#16a34a'; m.style.display='block'; setTimeout(closeChangePwModal,1200); }
+      else { m.textContent=res.data.error||'Något gick fel.'; m.style.color='#b31e59'; m.style.display='block'; }
+    })
+    .catch(function(){ m.textContent='Något gick fel.'; m.style.color='#b31e59'; m.style.display='block'; });
 }
 function closeShareModal() { document.getElementById('shareModal').style.display='none'; _sharePost=null; }
 function copyShareText() {
