@@ -158,7 +158,7 @@ textarea.field-input{resize:none;line-height:1.5}
 .review-card{background:#fff;border:2px solid #e5e7eb;border-radius:14px;overflow:hidden;cursor:pointer;transition:all .2s;box-shadow:0 1px 3px rgba(0,0,0,.04)}
 .review-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1)}
 .review-card.selected{border-color:var(--m);box-shadow:0 4px 16px rgba(177,30,89,.15)}
-.rc-thumb{aspect-ratio:1;position:relative;overflow:hidden}
+.rc-thumb{aspect-ratio:var(--rc-ar,1);position:relative;overflow:hidden}
 .rc-layout-btn{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.5);color:#fff;font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;backdrop-filter:blur(4px);transition:background .15s;z-index:2}
 .rc-layout-btn:hover{background:rgba(0,0,0,.75)}
 .rc-ch-badge{position:absolute;top:8px;right:8px;font-size:10px;font-weight:500;padding:3px 8px;border-radius:99px;z-index:2}
@@ -1517,7 +1517,7 @@ function renderPreview() {
   const mockPost = { channel: ch, layout: 'gradient', ...p };
   body.innerHTML = `
     <div style="width:220px">
-      <div style="border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15);aspect-ratio:var(--post-ar,1)">
+      <div style="border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15);aspect-ratio:'+_arFor(mockPost.channel)+'">
         ${getPostImageHTML(mockPost)}
       </div>
       <div style="font-size:11px;color:#9ca3af;text-align:center;margin-top:8px;font-family:Helvetica,Arial,sans-serif">${CH_LABEL[ch]} · spot.</div>
@@ -1920,7 +1920,7 @@ function renderProposalCards(ch) {
       const cardLayouts = ['studio','case','louisiana'];
       const mockPost = { channel: ch, layout: cardLayouts[i] || 'gradient', title: p.title||'', content: p.content||'', hashtags: (p.hashtags||[]).map(t=>t.replace(/^#/,'')), cta: p.cta||'', imageUrl: activeImageUrl(), imageStyle: S.imageStyle };
       return `<div class="ai-prop-card ${i===selectedIdx?'selected':''}" onclick="selectProposalCard('${ch}',${i})">
-        <div class="ai-prop-thumb" style="position:relative">
+        <div class="ai-prop-thumb" style="position:relative;aspect-ratio:'+_arFor(ch)+'">
           ${getPostImageHTML(mockPost)}
           ${S._aiImageLoading ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;z-index:5"><div style="width:22px;height:22px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite"></div><div style="font-size:9px;color:#fff;font-weight:600">Skapar bild…</div></div>` : ''}
           <button class="prop-zoom-btn" title="Förstora" onclick="event.stopPropagation();openProposalZoom('${ch}',${i})">⤢</button>
@@ -1993,7 +1993,7 @@ function updateManualPreview() {
   if (panelTitle) panelTitle.textContent = 'Förhandsvisning';
   body.innerHTML = `
     <div style="width:100%">
-      <div style="border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15);aspect-ratio:var(--post-ar,1)">
+      <div style="border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15);aspect-ratio:'+_arFor(mockPost.channel)+'">
         ${getPostImageHTML(mockPost)}
       </div>
       <div style="font-size:11px;color:#9ca3af;text-align:center;margin-top:8px">${CH_LABEL[S.manualChannel]}</div>
