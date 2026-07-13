@@ -2930,7 +2930,7 @@ function renderAdvocacy() {
         </div>
         <div class="adv-post-title">${p.title||'(Utan titel)'}</div>
         <div class="adv-post-content">${p.content||''}</div>
-        <button class="adv-share-btn" onclick='openShareModal(${i}, window._advPosts)'>🔗 Dela på min profil</button>
+        <button class="adv-share-btn" onclick='quickShareAdvocacy(${i}, window._advPosts)'>🔗 Dela på min profil</button>
       </div>
     </div>`;
   }).join('');
@@ -2938,6 +2938,32 @@ function renderAdvocacy() {
 }
 
 let _sharePost = null;
+function quickShareAdvocacy(idx, posts) {
+  const p = (posts||[])[idx];
+  if (!p) return;
+  const chans = _getMyCh();
+  const match = chans.find(c => c.platform === (p.channel||'linkedin'));
+  if (!match) { openShareModal(idx, posts); return; }
+  const tags = (p.hashtags||[]).map(t=>'#'+t.replace(/^#/,'')).join(' ');
+  const fullText = `${p.title||''}\n\n${p.content||''}\n\n${tags}${p.cta?'\n\n'+p.cta:''}`;
+  const encodedText = encodeURIComponent(fullText.slice(0,500));
+  const encodedTitle = encodeURIComponent(p.title||'');
+  const urls = {
+    linkedin: `https://www.linkedin.com/shareArticle?mini=true&title=${encodedTitle}&summary=${encodedText}`,
+    facebook: `https://www.facebook.com/sharer/sharer.php?quote=${encodedText}`,
+    twitter: `https://twitter.com/intent/tweet?text=${encodedText}`,
+    tiktok: null,
+    instagram: null
+  };
+  const url = urls[match.platform];
+  if (url) {
+    window.open(url, '_blank', 'noopener,width=600,height=500');
+    if (typeof showToast==='function') showToast('Delar till '+match.handle);
+  } else {
+    navigator.clipboard.writeText(fullText).then(()=>{ if(typeof showToast==='function') showToast('📋 Text kopierad — klistra in i '+match.platform); }).catch(()=>{});
+    window.open(_mcUrl(match), '_blank', 'noopener');
+  }
+}
 function openShareModal(idx, posts) {
   const p = (posts||[])[idx];
   if (!p) return;
