@@ -2513,7 +2513,7 @@ function renderLightbox() {
   const post = S.reviewQueue[S.lbIndex];
   if (!post) return;
   document.getElementById('lbCard').innerHTML = `
-    <div style="aspect-ratio:1;overflow:hidden">${getPostImageLargeHTML(post)}</div>
+    <div style="aspect-ratio:${_arFor(post.channel)};overflow:hidden">${getPostImageLargeHTML(post)}</div>
     <div class="lb-footer">
       <div><div class="lb-ft">${post.title}</div><div class="lb-fs">${CH_LABEL[post.channel]} · ${post.author} · ${LAYOUT_LABELS[post.layout||'gradient']}</div></div>
       <div class="lb-count">${S.lbIndex + 1} / ${S.reviewQueue.length}</div>
