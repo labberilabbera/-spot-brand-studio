@@ -1767,7 +1767,8 @@ function rejectPost(id){
     if(typeof showToast==="function")showToast("Inlägget nekades och skickades till utkast.");
   };
 }
-(function(){function _arFor(ch){return ({instagram:"4/5",tiktok:"9/16",facebook:"1/1",linkedin:"1/1"})[ch]||"4/5";}function _syncAR(){try{var ch=window._activeProposalTab||(typeof S!=="undefined"&&S.previewChannel)||(typeof S!=="undefined"&&S.manualChannel)||"instagram";document.documentElement.style.setProperty("--post-ar",_arFor(ch));}catch(e){}}setInterval(_syncAR,400);document.addEventListener("DOMContentLoaded",_syncAR);})();
+function _arFor(ch){return ({instagram:"4/5",tiktok:"9/16",facebook:"1/1",linkedin:"1/1"})[ch]||"4/5";}
+(function(){function _syncAR(){try{var ch=window._activeProposalTab||(typeof S!=="undefined"&&S.previewChannel)||(typeof S!=="undefined"&&S.manualChannel)||"instagram";document.documentElement.style.setProperty("--post-ar",_arFor(ch));}catch(e){}}setInterval(_syncAR,400);document.addEventListener("DOMContentLoaded",_syncAR);})();
 function _getMyCh(){ try{return JSON.parse(localStorage.getItem("spotMyChannels")||"[]");}catch(e){return [];} }
 function _setMyCh(a){ try{localStorage.setItem("spotMyChannels",JSON.stringify(a));}catch(e){} }
 function addMyChannel(){ var p=document.getElementById("mcPlatform"), h=document.getElementById("mcHandle"); if(!p||!h)return; var handle=(h.value||"").trim(); if(!handle){h.focus();return;} var a=_getMyCh(); a.push({platform:p.value, handle:handle}); _setMyCh(a); h.value=""; renderMyChannels(); if(typeof showToast==="function")showToast("Kanal tillagd"); }
