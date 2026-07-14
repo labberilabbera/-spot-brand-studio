@@ -215,7 +215,7 @@ textarea.field-input{resize:none;line-height:1.5}
 /* ── LIGHTBOX ── */
 #lightbox{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:200;display:none;align-items:center;justify-content:center}
 #lightbox.open{display:flex}
-.lb-card{max-width:480px;width:calc(100% - 120px);border-radius:20px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.5);position:relative}
+.lb-card{max-width:min(480px,calc(100% - 120px));max-height:88vh;border-radius:20px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.5);position:relative;display:flex;flex-direction:column}
 .lb-footer{background:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between}
 .lb-ft{font-size:13px;font-weight:600;color:#111}.lb-fs{font-size:11px;color:#9ca3af;margin-top:2px}
 .lb-count{font-size:12px;color:#9ca3af}
@@ -2513,7 +2513,7 @@ function renderLightbox() {
   const post = S.reviewQueue[S.lbIndex];
   if (!post) return;
   document.getElementById('lbCard').innerHTML = `
-    <div style="aspect-ratio:${_arFor(post.channel)};overflow:hidden">${getPostImageLargeHTML(post)}</div>
+    <div style="aspect-ratio:${_arFor(post.channel)};overflow:hidden;flex:1 1 auto;min-height:0;width:100%">${getPostImageLargeHTML(post)}</div>
     <div class="lb-footer">
       <div><div class="lb-ft">${post.title}</div><div class="lb-fs">${CH_LABEL[post.channel]} · ${post.author} · ${LAYOUT_LABELS[post.layout||'gradient']}</div></div>
       <div class="lb-count">${S.lbIndex + 1} / ${S.reviewQueue.length}</div>
