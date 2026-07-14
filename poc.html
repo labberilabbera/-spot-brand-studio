@@ -2122,7 +2122,7 @@ function renderReview() {
     if (c.isValid && !c.warnings.length) badges = '<span class="rule-ok">✓ OK</span>';
     else badges = [...c.issues.map(i => `<span class="rule-err">✗ ${i}</span>`), ...c.warnings.map(w => `<span class="rule-warn">⚠ ${w}</span>`)].join('');
     return `<div class="review-card ${S.selectedReviewId === post.id ? 'selected' : ''}" onclick="selectReview('${post.id}')">
-      <div class="rc-thumb" style="aspect-ratio:1;position:relative;overflow:hidden;" onclick="event.stopPropagation();openLightbox(${idx})">
+      <div class="rc-thumb" style="aspect-ratio:${_arFor(post.channel)};position:relative;overflow:hidden;" onclick="event.stopPropagation();openLightbox(${idx})">
         ${getPostImageHTML(post)}
         <button class="rc-layout-btn" onclick="event.stopPropagation();openLayoutPicker('${post.id}')">🎨 Layout</button>
         <div class="rc-ch-badge" style="background:rgba(255,255,255,.9);color:${CH_TC[post.channel]}">${CH_LABEL[post.channel]}</div>
