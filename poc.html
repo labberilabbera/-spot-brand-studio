@@ -673,11 +673,8 @@ textarea.field-input{resize:none;line-height:1.5}
       <div class="card">
         <div class="card-header">🖼️ Bildbibliotek</div>
         <div style="padding:16px 18px">
-          <div style="font-size:12px;color:#6b7280;margin-bottom:12px">Generera on-brand bilder med AI och spara i biblioteket för återanvändning.</div>
-          <div style="display:flex;gap:8px;margin-bottom:14px">
-            <input id="libPrompt" type="text" placeholder="Beskriv bilden, t.ex. minimalistisk kontorsmiljö..." style="flex:1;padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:13px"/>
-            <button id="libGenBtn" onclick="generateLibraryImage()" style="padding:10px 16px;background:var(--m);color:#fff;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">✨ Generera</button>
-          </div>
+          <div style="font-size:12px;color:#6b7280;margin-bottom:12px">Ladda upp bilder från din telefon eller dator för att spara i biblioteket för återanvändning.</div>
+          <label style="display:inline-block;padding:10px 16px;background:var(--m);color:#fff;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:14px">📤 Ladda upp bild<input id="libUploadInput" type="file" accept="image/*" multiple style="display:none" onchange="uploadLibraryImages(this)"/></label>
           <div id="imgLibGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px"></div>
         </div>
       </div>
@@ -916,6 +913,44 @@ const S = {
 };
 (function(){ try{ var _as=JSON.parse(localStorage.getItem('spotAppState')||'null'); if(_as){ if(Array.isArray(_as.reviewQueue))S.reviewQueue=_as.reviewQueue; if(Array.isArray(_as.publishedPosts))S.publishedPosts=_as.publishedPosts; if(_as.archiveOverride)S.archiveOverride=_as.archiveOverride; } }catch(e){} })();
 function _saveAppState(){ try{ localStorage.setItem('spotAppState', JSON.stringify({reviewQueue:S.reviewQueue, publishedPosts:S.publishedPosts, archiveOverride:S.archiveOverride})); }catch(e){} }
+function _getImgLib(){ try{ return JSON.parse(localStorage.getItem('spotImgLibrary')||'[]'); }catch(e){ return []; } }
+function _setImgLib(a){ try{ localStorage.setItem('spotImgLibrary', JSON.stringify(a)); return true; }catch(e){ return false; } }
+function renderImgLibrary(){
+  var grid = document.getElementById('imgLibGrid');
+  if (!grid) return;
+  var lib = _getImgLib();
+  if (!lib.length) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;font-size:12px;color:#9ca3af">Inga bilder uppladdade ännu.</div>'; return; }
+  grid.innerHTML = lib.map(function(img, i){
+    return '<div style="position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb"><img src="' + img.url + '" style="width:100%;height:100%;object-fit:cover"/><button onclick="deleteLibraryImage(' + i + ')" style="position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;border:none;font-size:12px;cursor:pointer;line-height:1">×</button></div>';
+  }).join('');
+}
+function uploadLibraryImages(input){
+  var files = Array.prototype.slice.call(input.files || []);
+  if (!files.length) return;
+  var lib = _getImgLib();
+  var remaining = files.length;
+  files.forEach(function(file){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      lib.push({ url: e.target.result, name: file.name, ts: Date.now() });
+      remaining--;
+      if (remaining === 0) {
+        var ok = _setImgLib(lib);
+        if (!ok) { showToast('⚠️ Lagringen är full — ta bort någon bild.'); }
+        else { showToast('📤 Bild uppladdad!'); }
+        renderImgLibrary();
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value = '';
+}
+function deleteLibraryImage(i){
+  var lib = _getImgLib();
+  lib.splice(i, 1);
+  _setImgLib(lib);
+  renderImgLibrary();
+}
 // Aktiv bild: uppladdad har företräde, annars AI-genererad
 function activeImageUrl() { return S._uploadedImageUrl || S._aiImageUrl || null; }
 
@@ -2697,6 +2732,7 @@ function renderColors(){var el=document.getElementById("colorRow");if(!el)return
 function renderTypography(){var el=document.getElementById("typoRows");if(!el)return;var edit=!!S.editTypo;var html=TYPOGRAPHY.map(function(t,i){var size=t.weight==="700"?"22px":t.weight==="400"?"14px":"12px";if(edit){return '<div class="typo-row" style="gap:10px;align-items:center">'+'<div style="font-weight:'+t.weight+';font-size:'+size+';color:#111;min-width:90px;font-family:Helvetica,Arial,sans-serif">'+t.sample+'</div>'+'<div class="typo-meta" style="flex:1">'+'<input class="bt-name" data-i="'+i+'" value="'+t.name+'" style="width:100%;font-size:13px;font-weight:600;border:1px solid #e5e7eb;border-radius:6px;padding:4px 6px">'+'<input class="bt-role" data-i="'+i+'" value="'+(t.role||"")+'" placeholder="roll" style="width:100%;margin-top:3px;font-size:11px;border:1px solid #e5e7eb;border-radius:6px;padding:4px 6px">'+'</div>'+'<button class="bt-del" data-i="'+i+'" style="width:22px;height:22px;border-radius:50%;background:#b31e59;color:#fff;border:none;cursor:pointer;flex-shrink:0">×</button>'+'</div>';}return '<div class="typo-row"><div style="font-weight:'+t.weight+';font-size:'+size+';color:#111;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:Helvetica,Arial,sans-serif">'+t.sample+'</div><div class="typo-meta"><div class="typo-name">'+t.name+'</div><div class="typo-role">'+(t.role||"")+'</div></div></div>';}).join("");if(edit)html+='<div style="padding:10px 16px"><button class="bt-add" style="width:100%;padding:9px;border:2px dashed #d1d5db;border-radius:8px;background:#fafafa;color:#6b7280;cursor:pointer;font-size:13px">+ Lägg till typsnitt</button></div>';el.innerHTML=html;if(!edit)return;el.querySelectorAll(".bt-name").forEach(function(x){x.oninput=function(){TYPOGRAPHY[+x.dataset.i].name=x.value;saveBrandSettings();};});el.querySelectorAll(".bt-role").forEach(function(x){x.oninput=function(){TYPOGRAPHY[+x.dataset.i].role=x.value;saveBrandSettings();};});el.querySelectorAll(".bt-del").forEach(function(x){x.onclick=function(){TYPOGRAPHY.splice(+x.dataset.i,1);saveBrandSettings();renderTypography();};});var add=el.querySelector(".bt-add");if(add)add.onclick=function(){TYPOGRAPHY.push({name:"Nytt typsnitt",weight:"400",sample:"spot.",role:""});saveBrandSettings();renderTypography();};}
 
 function renderBrand() {
+  renderImgLibrary();
   if(!S._brandLoaded){ loadBrandSettings(); S._brandLoaded=true; }
   renderImgStyleGrid();
   renderBrandLogo();
