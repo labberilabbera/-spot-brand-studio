@@ -61,6 +61,40 @@ app.post('/login', async (req, res) => {
 })
 app.post('/logout', (req, res) => { delete sessions[getToken(req)]; res.setHeader('Set-Cookie', 'spot_session=; Path=/; Max-Age=0'); res.json({ ok: true }) })
 app.get('/api/me', auth, (req, res) => { const s = sessions[getToken(req)] || {}; const firstName = s.firstName || 'Spot'; const lastName = s.lastName || 'Admin'; const role = s.role || 'admin'; const initials = (firstName[0]||'') + (lastName[0]||''); res.json({ firstName, lastName, role, initials: initials.toUpperCase() }) })
+app.post('/api/team/invite', auth, async (req, res) => {
+  const s = sessions[getToken(req)] || {}
+  if ((s.role || 'admin') !== 'admin') return res.status(403).json({ error: 'Endast admin kan bjuda in medlemmar' })
+  try {
+    const { name, email, password, role } = req.body || {}
+    if (!name || !email || !password) return res.status(400).json({ error: 'Namn, e-post och lösenord krävs' })
+    if (String(password).length < 4) return res.status(400).json({ error: 'Lösenordet måste vara minst 4 tecken' })
+    const roleMap = { admin: 'admin', editor: 'redaktor', viewer: 'granskare' }
+    const dbRole = roleMap[role] || 'granskare'
+    const parts = String(name).trim().split(/\s+/)
+    const firstName = parts[0] || name
+    const lastName = parts.slice(1).join(' ') || ''
+    let username = String(email).split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '')
+    await ensureUsersTable()
+    let candidate = username, n = 1
+    while ((await getAuthPool().query('SELECT 1 FROM app_users WHERE username=$1', [candidate])).rows.length) {
+      candidate = username + n; n++
+    }
+    username = candidate
+    await getAuthPool().query('INSERT INTO app_users (username,password,role,first_name,last_name) VALUES ($1,$2,$3,$4,$5)', [username, password, dbRole, firstName, lastName])
+    res.json({ ok: true, username })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.post('/api/team/remove', auth, async (req, res) => {
+  const s = sessions[getToken(req)] || {}
+  if ((s.role || 'admin') !== 'admin') return res.status(403).json({ error: 'Endast admin kan ta bort medlemmar' })
+  try {
+    const { username } = req.body || {}
+    if (!username) return res.status(400).json({ error: 'username saknas' })
+    await ensureUsersTable()
+    await getAuthPool().query('DELETE FROM app_users WHERE username=$1', [username])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
 app.post('/api/change-password', auth, async (req, res) => { const { currentPassword, newPassword } = req.body || {}; if (!newPassword || String(newPassword).length < 4) return res.status(400).json({ error: 'Nytt lösenord måste vara minst 4 tecken' }); if (currentPassword !== await getPassword()) return res.status(401).json({ error: 'Fel nuvarande lösenord' }); await setPassword(String(newPassword)); res.json({ ok: true }) })
 app.get('/forgot', (_req, res) => res.send(FORGOT_HTML))
 app.post('/forgot', async (req, res) => { try { const { recoveryCode, newPassword } = req.body || {}; const expected = process.env.APP_RECOVERY_CODE; if (!expected) return res.redirect('/forgot?err=nocfg'); if (!recoveryCode || recoveryCode !== expected) return res.redirect('/forgot?err=1'); if (!newPassword || String(newPassword).length < 4) return res.redirect('/forgot?err=1'); await setPassword(String(newPassword)); res.redirect('/login?reset=1') } catch (e) { console.error('[forgot] error:', e.message); res.redirect('/forgot?err=1') } })
