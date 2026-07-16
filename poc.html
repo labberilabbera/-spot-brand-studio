@@ -1383,6 +1383,7 @@ function checkCompliance(post) {
 // ════════════════════════════════════════════════════════
 function navigate(view) {
   setTimeout(applyRolePermissions, 0);
+  if (view === 'team') loadTeamMembers();
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('v-' + view).classList.add('active');
@@ -3043,6 +3044,20 @@ const TEAM_MEMBERS = [
 const ROLE_LABEL = {admin:'👑 Admin', editor:'✍️ Redaktör', viewer:'👁 Granskare'};
 const ROLE_CLASS = {admin:'role-admin', editor:'role-editor', viewer:'role-viewer'};
 
+function loadTeamMembers(){
+  fetch('/api/team/members').then(function(r){ return r.json(); }).then(function(data){
+    if (!data.members) return;
+    var roleRev = {admin:'admin', redaktor:'editor', granskare:'viewer'};
+    var colors = ['#b31e59','#2563eb','#7c3aed','#059669','#d97706'];
+    TEAM_MEMBERS.length = 0;
+    data.members.forEach(function(u, i){
+      var name = ((u.first_name||'') + ' ' + (u.last_name||'')).trim() || u.username;
+      var initials = name.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);
+      TEAM_MEMBERS.push({ id: u.username, name: name, email: u.email || u.username, role: roleRev[u.role] || 'viewer', color: colors[i % colors.length], initials: initials, username: u.username });
+    });
+    renderTeam();
+  }).catch(function(){});
+}
 function renderTeam() {
   setTimeout(applyRolePermissions, 0);
   document.getElementById('memberCount').textContent = `${TEAM_MEMBERS.length} medlemmar`;
