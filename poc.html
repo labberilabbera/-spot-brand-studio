@@ -655,7 +655,7 @@ textarea.field-input{resize:none;line-height:1.5}
 
     <!-- BRAND -->
     <div class="view" id="v-brand" style="overflow-y:auto;padding:24px;flex-direction:column;gap:20px">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between"><div><div class="page-title" style="font-family:Helvetica,Arial,sans-serif;font-weight:700;letter-spacing:-.03em">spot.</div><div class="page-sub">Grafisk profil · visuell identitet · kommunikationsriktlinjer · Halmstad</div></div><button onclick="downloadBrandFolder()" id="brandDownloadBtn" style="padding:9px 16px;background:var(--m);color:#fff;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">⬇️ Ladda ner allt</button></div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px"><div><div class="page-title" style="font-family:Helvetica,Arial,sans-serif;font-weight:700;letter-spacing:-.03em">spot.</div><div class="page-sub">Grafisk profil · visuell identitet · kommunikationsriktlinjer · Halmstad</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px"><div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:#374151"><label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="bdl-opt" value="logo" checked/> Logotyp</label><label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="bdl-opt" value="text" checked/> Färger &amp; texter</label><label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="bdl-opt" value="library" checked/> Bildbibliotek</label><label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="bdl-opt" value="templates" checked/> Mallbilder</label></div><button onclick="downloadBrandFolder()" id="brandDownloadBtn" style="padding:9px 16px;background:var(--m);color:#fff;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">⬇️ Ladda ner valt</button></div></div>
       <div class="card"><div class="card-header" style="display:flex;align-items:center;justify-content:space-between">Logotyp <button id="secBtn-logo" onclick="toggleSecEdit('logo')" style="font-size:12px;font-weight:600;padding:6px 14px;border-radius:8px;border:1.5px solid #b31e59;background:#fff;color:#b31e59;cursor:pointer">Redigera</button></div><div id="brandLogoBox"></div></div>
       <div class="card"><div class="card-header" style="display:flex;align-items:center;justify-content:space-between">Färgpalett <button id="secBtn-colors" onclick="toggleSecEdit('colors')" style="font-size:12px;font-weight:600;padding:6px 14px;border-radius:8px;border:1.5px solid #b31e59;background:#fff;color:#b31e59;cursor:pointer">Redigera</button></div><div style="padding:18px"><div class="color-row" id="colorRow"></div></div></div>
       <div class="card">
@@ -2725,38 +2725,50 @@ function saveBrandSettings(){try{localStorage.setItem("spotBrand",JSON.stringify
 function _dataUrlToBinary(dataUrl){var parts=dataUrl.split(",");var meta=parts[0];var b64=parts[1];var ext="png";var m=/data:image\/(\w+)/.exec(meta);if(m)ext=m[1]==="jpeg"?"jpg":m[1];return {base64:b64,ext:ext};}
 async function downloadBrandFolder(){
   var btn=document.getElementById("brandDownloadBtn");
+  var opts={};
+  document.querySelectorAll(".bdl-opt").forEach(function(cb){opts[cb.value]=cb.checked;});
+  if(!opts.logo && !opts.text && !opts.library && !opts.templates){
+    if(typeof showToast==="function") showToast("⚠️ Välj minst en kategori att ladda ner.");
+    return;
+  }
   if(btn){btn.textContent="⏳ Förbereder...";btn.disabled=true;}
   try{
     var zip=new JSZip();
-    zip.file("varumarke.json", JSON.stringify({colors:COLORS,typography:TYPOGRAPHY,dos:DOS_RULES,donts:DONTS_RULES}, null, 2));
-    if(BRAND_LOGO && BRAND_LOGO.indexOf("data:")===0){
+    if(opts.text){
+      zip.file("varumarke.json", JSON.stringify({colors:COLORS,typography:TYPOGRAPHY,dos:DOS_RULES,donts:DONTS_RULES}, null, 2));
+    }
+    if(opts.logo && BRAND_LOGO && BRAND_LOGO.indexOf("data:")===0){
       var lg=_dataUrlToBinary(BRAND_LOGO);
       zip.file("logo."+lg.ext, lg.base64, {base64:true});
     }
-    var lib=_getImgLib();
-    var libFolder=zip.folder("bildbibliotek");
-    lib.forEach(function(img,i){
-      if(img.url && img.url.indexOf("data:")===0){
-        var b=_dataUrlToBinary(img.url);
-        libFolder.file((img.name||("bild-"+(i+1)))+"."+b.ext, b.base64, {base64:true});
-      }
-    });
-    var tplFolder=zip.folder("mallbilder");
-    for(var i=0;i<TEMPLATES.length;i++){
-      var t=TEMPLATES[i];
-      if(!t.src) continue;
-      try{
-        if(t.src.indexOf("data:")===0){
-          var b2=_dataUrlToBinary(t.src);
-          tplFolder.file((t.label||("mall-"+(i+1)))+"."+b2.ext, b2.base64, {base64:true});
-        } else {
-          var resp=await fetch(t.src);
-          var blob=await resp.blob();
-          var extMatch=/\.(\w+)$/.exec(t.src);
-          var ext=extMatch?extMatch[1]:"png";
-          tplFolder.file((t.label||("mall-"+(i+1)))+"."+ext, blob);
+    if(opts.library){
+      var lib=_getImgLib();
+      var libFolder=zip.folder("bildbibliotek");
+      lib.forEach(function(img,i){
+        if(img.url && img.url.indexOf("data:")===0){
+          var b=_dataUrlToBinary(img.url);
+          libFolder.file((img.name||("bild-"+(i+1)))+"."+b.ext, b.base64, {base64:true});
         }
-      }catch(e){}
+      });
+    }
+    if(opts.templates){
+      var tplFolder=zip.folder("mallbilder");
+      for(var i=0;i<TEMPLATES.length;i++){
+        var t=TEMPLATES[i];
+        if(!t.src) continue;
+        try{
+          if(t.src.indexOf("data:")===0){
+            var b2=_dataUrlToBinary(t.src);
+            tplFolder.file((t.label||("mall-"+(i+1)))+"."+b2.ext, b2.base64, {base64:true});
+          } else {
+            var resp=await fetch(t.src);
+            var blob=await resp.blob();
+            var extMatch=/\.(\w+)$/.exec(t.src);
+            var ext=extMatch?extMatch[1]:"png";
+            tplFolder.file((t.label||("mall-"+(i+1)))+"."+ext, blob);
+          }
+        }catch(e){}
+      }
     }
     var blobOut=await zip.generateAsync({type:"blob"});
     var url=URL.createObjectURL(blobOut);
@@ -2768,7 +2780,7 @@ async function downloadBrandFolder(){
   }catch(e){
     if(typeof showToast==="function") showToast("⚠️ Kunde inte skapa zip: "+e.message);
   }finally{
-    if(btn){btn.textContent="⬇️ Ladda ner allt";btn.disabled=false;}
+    if(btn){btn.textContent="⬇️ Ladda ner valt";btn.disabled=false;}
   }
 }
 function toggleBrandEdit(){S.brandEdit=!S.brandEdit;renderBrand();}
