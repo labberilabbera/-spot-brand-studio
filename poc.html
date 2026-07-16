@@ -419,7 +419,7 @@ textarea.field-input{resize:none;line-height:1.5}
       <div class="pub-dropdown" id="pubDropdown"><div style="padding:12px 14px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;gap:10px"><div class="tb-avatar" style="width:36px;height:36px;flex-shrink:0"><span id="avatarInitials2">A</span></div><div style="min-width:0"><div id="userFullName" style="font-size:14px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Laddar…</div><div style="font-size:11px;color:#9ca3af">Inloggad</div></div></div><div class="pd-header">Mina kanaler (snabbdelning)</div><div id="myChannels"><div class="pd-empty">Inga kanaler tillagda</div></div><div style="padding:8px 14px;display:flex;gap:6px;border-bottom:1px solid #f0f0f0"><select id="mcPlatform" style="font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px"><option value="instagram">📷 IG</option><option value="linkedin">💼 LI</option><option value="facebook">👥 FB</option><option value="tiktok">🎵 TT</option></select><input id="mcHandle" placeholder="@namn eller länk" style="flex:1;min-width:0;font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px 8px"><button onclick="addMyChannel()" style="font-size:14px;font-weight:700;padding:5px 12px;border-radius:6px;border:none;background:var(--m);color:#fff;cursor:pointer">+</button></div>
         <div class="pd-header">Publicerade inlägg</div>
         <div id="pubList"><div class="pd-empty">Inga publicerade inlägg ännu</div></div>
-        <div style="border-top:1px solid #f0f0f0;padding:10px 14px"><button onclick="openChangePwModal()" style="width:100%;text-align:left;background:none;border:none;font-size:13px;color:#374151;cursor:pointer;padding:4px 0">🔒 Byt lösenord</button></div>
+        <div style="border-top:1px solid #f0f0f0;padding:10px 14px"><button onclick="openChangePwModal()" style="width:100%;text-align:left;background:none;border:none;font-size:13px;color:#374151;cursor:pointer;padding:4px 0">🔒 Byt lösenord</button><button onclick="doLogout()" style="width:100%;text-align:left;background:none;border:none;font-size:13px;color:#b31e59;cursor:pointer;padding:4px 0">🚪 Logga ut</button></div>
       </div>
     </div>
   </div>
@@ -3226,6 +3226,7 @@ function openShareModal(idx, posts) {
 }
 function openChangePwModal(){ document.getElementById('changePwModal').style.display='flex'; document.getElementById('cpwCurrent').value=''; document.getElementById('cpwNew').value=''; var m=document.getElementById('cpwMsg'); m.style.display='none'; togglePubDropdown(); }
 function closeChangePwModal(){ document.getElementById('changePwModal').style.display='none'; }
+function doLogout(){ fetch('/logout', {method:'POST'}).then(function(){ location.href = '/login'; }); }
 function submitChangePw(){
   var cur=document.getElementById('cpwCurrent').value, nw=document.getElementById('cpwNew').value;
   var m=document.getElementById('cpwMsg');
