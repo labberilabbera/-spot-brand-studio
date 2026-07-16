@@ -2524,19 +2524,19 @@ function closeLayoutPicker(e) {
 //  LIGHTBOX
 // ════════════════════════════════════════════════════════
 function openLightbox(idx) { S.lbIndex = idx; renderLightbox(); document.getElementById('lightbox').classList.add('open'); }
-function closeLightboxBtn() { document.getElementById('lightbox').classList.remove('open'); }
+function closeLightboxBtn() { document.getElementById('lightbox').classList.remove('open'); S._lbSingle = null; }
 function closeLightboxClick(e) { if (e.target.id === 'lightbox') closeLightboxBtn(); }
-function lbPrev(e) { e.stopPropagation(); S.lbIndex = (S.lbIndex - 1 + S.reviewQueue.length) % S.reviewQueue.length; renderLightbox(); }
-function lbNext(e) { e.stopPropagation(); S.lbIndex = (S.lbIndex + 1) % S.reviewQueue.length; renderLightbox(); }
+function lbPrev(e) { e.stopPropagation(); if (S._lbSingle) return; S.lbIndex = (S.lbIndex - 1 + S.reviewQueue.length) % S.reviewQueue.length; renderLightbox(); }
+function lbNext(e) { e.stopPropagation(); if (S._lbSingle) return; S.lbIndex = (S.lbIndex + 1) % S.reviewQueue.length; renderLightbox(); }
 function renderLightbox() {
-  const post = S.reviewQueue[S.lbIndex];
+  const post = S._lbSingle || S.reviewQueue[S.lbIndex];
   if (!post) return;
   const card = document.getElementById('lbCard');
   card.innerHTML = `
     <div id="lbImgWrap" style="overflow:hidden;width:100%">${getPostImageLargeHTML(post)}</div>
     <div class="lb-footer">
       <div><div class="lb-ft">${post.title}</div><div class="lb-fs">${CH_LABEL[post.channel]} · ${post.author} · ${LAYOUT_LABELS[post.layout||'gradient']}</div></div>
-      <div class="lb-count">${S.lbIndex + 1} / ${S.reviewQueue.length}</div>
+      <div class="lb-count">${S._lbSingle ? '' : (S.lbIndex + 1) + ' / ' + S.reviewQueue.length}</div>
     </div>`;
   _fitLightboxCard(post);
 }
@@ -3309,15 +3309,19 @@ function calGoToday() { _calMonthOffset = 0; renderSchema(); }
 function openScheduledPost(id) {
   const inQueue = S.reviewQueue.find(x => x.id === id);
   if (inQueue) {
-    S.selectedReviewId = id;
-    navigate('review');
-    setTimeout(() => renderDetailPanel(), 50);
+    S.lbIndex = S.reviewQueue.indexOf(inQueue);
+    S._lbSingle = null;
+    renderLightbox();
+    document.getElementById('lightbox').classList.add('open');
     return;
   }
-  // Demo post — just show a toast
   const all = getScheduledPosts();
   const p = all.find(x => x.id === id);
-  if (p) showToast(`📅 ${p.title} — ${new Date(p.scheduledAt).toLocaleDateString('sv-SE',{day:'numeric',month:'long'})}`);
+  if (p) {
+    S._lbSingle = p;
+    renderLightbox();
+    document.getElementById('lightbox').classList.add('open');
+  }
 }
 
 function createForDay(dateStr) {
