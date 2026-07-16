@@ -3070,12 +3070,12 @@ function renderTeam() {
       </div>
       <span class="member-role-badge ${ROLE_CLASS[m.role]}">${ROLE_LABEL[m.role]}</span>
       <div class="member-actions">
-        <select onchange="changeMemberRole(${m.id}, this.value)" style="font-size:11px">
+        <select onchange="changeMemberRole(\'${m.id}\', this.value)" style="font-size:11px">
           <option value="admin"  ${m.role==='admin' ?'selected':''}>Admin</option>
           <option value="editor" ${m.role==='editor'?'selected':''}>Redaktör</option>
           <option value="viewer" ${m.role==='viewer'?'selected':''}>Granskare</option>
         </select>
-        ${m.id !== 1 ? `<button onclick="removeMember(${m.id})">Ta bort</button>` : ''}
+        ${m.id !== 1 ? `<button onclick="removeMember(\'${m.id}\')">Ta bort</button>` : ''}
       </div>
     </div>`).join('');
 }
