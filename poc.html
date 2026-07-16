@@ -670,6 +670,17 @@ textarea.field-input{resize:none;line-height:1.5}
         <div class="card"><div class="card-header" style="display:flex;align-items:center;justify-content:space-between"><span>❌ Don'ts <span style="font-size:11px;font-weight:400;color:#9ca3af">Admin</span></span> <button id="secBtn-donts" onclick="toggleSecEdit('donts')" style="font-size:11px;font-weight:600;padding:5px 12px;border-radius:8px;border:1.5px solid #b31e59;background:#fff;color:#b31e59;cursor:pointer">Redigera</button></div><div id="dontsRows"></div></div>
       </div>
       <div class="card"><div class="card-header" style="display:flex;align-items:center;justify-content:space-between">🖼 Mallbilder <button id="secBtn-templates" onclick="toggleSecEdit('templates')" style="font-size:11px;font-weight:600;padding:5px 12px;border-radius:8px;border:1.5px solid #b31e59;background:#fff;color:#b31e59;cursor:pointer">Redigera</button></div><div class="templates-grid" id="templatesGrid"></div></div>
+      <div class="card">
+        <div class="card-header">🖼️ Bildbibliotek</div>
+        <div style="padding:16px 18px">
+          <div style="font-size:12px;color:#6b7280;margin-bottom:12px">Generera on-brand bilder med AI och spara i biblioteket för återanvändning.</div>
+          <div style="display:flex;gap:8px;margin-bottom:14px">
+            <input id="libPrompt" type="text" placeholder="Beskriv bilden, t.ex. minimalistisk kontorsmiljö..." style="flex:1;padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:13px"/>
+            <button id="libGenBtn" onclick="generateLibraryImage()" style="padding:10px 16px;background:var(--m);color:#fff;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">✨ Generera</button>
+          </div>
+          <div id="imgLibGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px"></div>
+        </div>
+      </div>
     </div>
 
     <!-- PUBLICERADE -->
