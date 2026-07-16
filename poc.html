@@ -3082,7 +3082,16 @@ function renderTeam() {
 
 function changeMemberRole(id, newRole) {
   const m = TEAM_MEMBERS.find(m => m.id === id);
-  if (m) { m.role = newRole; renderTeam(); showToast(`✅ ${m.name} är nu ${ROLE_LABEL[newRole]}`); }
+  if (!m) return;
+  fetch('/api/team/role', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: id, role: newRole }) })
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, data:d}; }); })
+    .then(function(res){
+      if (!res.ok) { showToast('⚠️ ' + (res.data.error||'Kunde inte spara rollen')); renderTeam(); return; }
+      m.role = newRole;
+      renderTeam();
+      showToast(`✅ ${m.name} är nu ${ROLE_LABEL[newRole]}`);
+    })
+    .catch(function(){ showToast('⚠️ Kunde inte spara rollen'); renderTeam(); });
 }
 
 function removeMember(id) {
