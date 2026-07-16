@@ -14,6 +14,20 @@ const { Pool } = require('pg')
 let _authPool = null
 function getAuthPool() { if (!_authPool) _authPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }); return _authPool }
 async function ensureAuthTable() { await getAuthPool().query("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT)") }
+async function ensureUsersTable() {
+  await getAuthPool().query("CREATE TABLE IF NOT EXISTS app_users (username TEXT PRIMARY KEY, password TEXT, role TEXT, first_name TEXT, last_name TEXT)")
+  const r = await getAuthPool().query("SELECT COUNT(*) FROM app_users")
+  if (parseInt(r.rows[0].count, 10) === 0) {
+    await getAuthPool().query("INSERT INTO app_users (username,password,role,first_name,last_name) VALUES ($1,$2,$3,$4,$5),($6,$7,$8,$9,$10),($11,$12,$13,$14,$15)", [
+      'admin', '1234', 'admin', 'Anna', 'Andersson',
+      'redaktor', '1234', 'redaktor', 'Erik', 'Eriksson',
+      'granskare', '1234', 'granskare', 'Gustav', 'Granberg'
+    ])
+  }
+}
+async function getUserByUsername(username) {
+  try { await ensureUsersTable(); const r = await getAuthPool().query("SELECT * FROM app_users WHERE username=$1", [username]); return r.rows[0] || null } catch (e) { console.error('[auth] getUserByUsername error:', e.message); return null }
+}
 async function getPassword() { try { await ensureAuthTable(); const r = await getAuthPool().query("SELECT value FROM app_settings WHERE key='password'"); return (r.rows[0] && r.rows[0].value) || UPASS } catch (e) { console.error('[auth] getPassword error:', e.message); return UPASS } }
 async function setPassword(pw) { try { await ensureAuthTable(); const r = await getAuthPool().query("INSERT INTO app_settings (key,value) VALUES ('password',$1) ON CONFLICT (key) DO UPDATE SET value=$1", [pw]); console.log('[auth] setPassword ok, rowCount:', r.rowCount) } catch (e) { console.error('[auth] setPassword error:', e.message) } }
 const resetTokens = {}
@@ -28,9 +42,25 @@ function makeToken() { return crypto.randomBytes(32).toString('hex') }
 function getToken(req) { const c = req.headers.cookie || ''; const p = c.split(';').map(x => x.trim()).find(x => x.startsWith('spot_session=')); return p ? p.split('=')[1] : null }
 function auth(req, res, next) { if (sessions[getToken(req)]) return next(); if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorized' }); res.redirect('/login') }
 app.get('/login', (_req, res) => res.send(LOGIN_HTML))
-app.post('/login', async (req, res) => { const { username, password } = req.body; if (username === UNAME && password === await getPassword()) { const t = makeToken(); sessions[t] = { u: username, firstName: process.env.APP_USER_FIRSTNAME || 'Spot', lastName: process.env.APP_USER_LASTNAME || 'Admin' }; res.setHeader('Set-Cookie', 'spot_session=' + t + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + (60*60*24*7)); return res.redirect('/') } res.redirect('/login?err=1') })
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body
+  const u = await getUserByUsername(username)
+  if (u && password === u.password) {
+    const t = makeToken()
+    sessions[t] = { u: u.username, role: u.role, firstName: u.first_name, lastName: u.last_name }
+    res.setHeader('Set-Cookie', 'spot_session=' + t + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + (60*60*24*7))
+    return res.redirect('/')
+  }
+  if (username === UNAME && password === await getPassword()) {
+    const t = makeToken()
+    sessions[t] = { u: username, role: 'admin', firstName: process.env.APP_USER_FIRSTNAME || 'Spot', lastName: process.env.APP_USER_LASTNAME || 'Admin' }
+    res.setHeader('Set-Cookie', 'spot_session=' + t + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + (60*60*24*7))
+    return res.redirect('/')
+  }
+  res.redirect('/login?err=1')
+})
 app.post('/logout', (req, res) => { delete sessions[getToken(req)]; res.setHeader('Set-Cookie', 'spot_session=; Path=/; Max-Age=0'); res.json({ ok: true }) })
-app.get('/api/me', auth, (req, res) => { const s = sessions[getToken(req)] || {}; const firstName = s.firstName || 'Spot'; const lastName = s.lastName || 'Admin'; const initials = (firstName[0]||'') + (lastName[0]||''); res.json({ firstName, lastName, initials: initials.toUpperCase() }) })
+app.get('/api/me', auth, (req, res) => { const s = sessions[getToken(req)] || {}; const firstName = s.firstName || 'Spot'; const lastName = s.lastName || 'Admin'; const role = s.role || 'admin'; const initials = (firstName[0]||'') + (lastName[0]||''); res.json({ firstName, lastName, role, initials: initials.toUpperCase() }) })
 app.post('/api/change-password', auth, async (req, res) => { const { currentPassword, newPassword } = req.body || {}; if (!newPassword || String(newPassword).length < 4) return res.status(400).json({ error: 'Nytt lösenord måste vara minst 4 tecken' }); if (currentPassword !== await getPassword()) return res.status(401).json({ error: 'Fel nuvarande lösenord' }); await setPassword(String(newPassword)); res.json({ ok: true }) })
 app.get('/forgot', (_req, res) => res.send(FORGOT_HTML))
 app.post('/forgot', async (req, res) => { try { const { recoveryCode, newPassword } = req.body || {}; const expected = process.env.APP_RECOVERY_CODE; if (!expected) return res.redirect('/forgot?err=nocfg'); if (!recoveryCode || recoveryCode !== expected) return res.redirect('/forgot?err=1'); if (!newPassword || String(newPassword).length < 4) return res.redirect('/forgot?err=1'); await setPassword(String(newPassword)); res.redirect('/login?reset=1') } catch (e) { console.error('[forgot] error:', e.message); res.redirect('/forgot?err=1') } })
