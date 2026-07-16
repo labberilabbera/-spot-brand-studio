@@ -85,6 +85,18 @@ app.post('/api/team/invite', auth, async (req, res) => {
     res.json({ ok: true, username })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
+app.post('/api/team/role', auth, async (req, res) => {
+  const s = sessions[getToken(req)] || {}
+  if ((s.role || 'admin') !== 'admin') return res.status(403).json({ error: 'Endast admin kan ändra roller' })
+  try {
+    const { username, role } = req.body || {}
+    const roleMap = { admin: 'admin', editor: 'redaktor', viewer: 'granskare' }
+    const dbRole = roleMap[role] || 'granskare'
+    await ensureUsersTable()
+    await getAuthPool().query('UPDATE app_users SET role=$1 WHERE username=$2', [dbRole, username])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
 app.get('/api/team/members', auth, async (req, res) => {
   try {
     await ensureUsersTable()
