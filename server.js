@@ -16,6 +16,7 @@ function getAuthPool() { if (!_authPool) _authPool = new Pool({ connectionString
 async function ensureAuthTable() { await getAuthPool().query("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT)") }
 async function ensureUsersTable() {
   await getAuthPool().query("CREATE TABLE IF NOT EXISTS app_users (username TEXT PRIMARY KEY, password TEXT, role TEXT, first_name TEXT, last_name TEXT)")
+  await getAuthPool().query("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email TEXT")
   const r = await getAuthPool().query("SELECT COUNT(*) FROM app_users")
   if (parseInt(r.rows[0].count, 10) === 0) {
     await getAuthPool().query("INSERT INTO app_users (username,password,role,first_name,last_name) VALUES ($1,$2,$3,$4,$5),($6,$7,$8,$9,$10),($11,$12,$13,$14,$15)", [
@@ -80,8 +81,15 @@ app.post('/api/team/invite', auth, async (req, res) => {
       candidate = username + n; n++
     }
     username = candidate
-    await getAuthPool().query('INSERT INTO app_users (username,password,role,first_name,last_name) VALUES ($1,$2,$3,$4,$5)', [username, password, dbRole, firstName, lastName])
+    await getAuthPool().query('INSERT INTO app_users (username,password,role,first_name,last_name,email) VALUES ($1,$2,$3,$4,$5,$6)', [username, password, dbRole, firstName, lastName, email])
     res.json({ ok: true, username })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.get('/api/team/members', auth, async (req, res) => {
+  try {
+    await ensureUsersTable()
+    const r = await getAuthPool().query('SELECT username, role, first_name, last_name, email FROM app_users ORDER BY username')
+    res.json({ members: r.rows })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 app.post('/api/team/remove', auth, async (req, res) => {
