@@ -412,7 +412,7 @@ textarea.field-input{resize:none;line-height:1.5}
   </div>
   <div class="tb-right">
     <div style="position:relative">
-      <div class="tb-avatar" id="avatarBtn" onclick="togglePubDropdown()">A
+      <div class="tb-avatar" id="avatarBtn" onclick="togglePubDropdown()"><span id="avatarInitials">A</span>
         <div class="pub-badge" id="pubBadge"></div>
       </div>
       <div class="pub-dropdown" id="pubDropdown"><div class="pd-header">Mina kanaler (snabbdelning)</div><div id="myChannels"><div class="pd-empty">Inga kanaler tillagda</div></div><div style="padding:8px 14px;display:flex;gap:6px;border-bottom:1px solid #f0f0f0"><select id="mcPlatform" style="font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px"><option value="instagram">📷 IG</option><option value="linkedin">💼 LI</option><option value="facebook">👥 FB</option><option value="tiktok">🎵 TT</option></select><input id="mcHandle" placeholder="@namn eller länk" style="flex:1;min-width:0;font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px 8px"><button onclick="addMyChannel()" style="font-size:14px;font-weight:700;padding:5px 12px;border-radius:6px;border:none;background:var(--m);color:#fff;cursor:pointer">+</button></div>
@@ -913,6 +913,8 @@ const S = {
 };
 (function(){ try{ var _as=JSON.parse(localStorage.getItem('spotAppState')||'null'); if(_as){ if(Array.isArray(_as.reviewQueue))S.reviewQueue=_as.reviewQueue; if(Array.isArray(_as.publishedPosts))S.publishedPosts=_as.publishedPosts; if(_as.archiveOverride)S.archiveOverride=_as.archiveOverride; } }catch(e){} })();
 function _saveAppState(){ try{ localStorage.setItem('spotAppState', JSON.stringify({reviewQueue:S.reviewQueue, publishedPosts:S.publishedPosts, archiveOverride:S.archiveOverride})); }catch(e){} }
+function _loadUserInfo(){ fetch('/api/me').then(function(r){ return r.json(); }).then(function(u){ var el=document.getElementById('avatarInitials'); if(el && u.initials) el.textContent=u.initials; var btn=document.getElementById('avatarBtn'); if(btn && u.firstName) btn.title=u.firstName+' '+u.lastName; }).catch(function(){}); }
+_loadUserInfo();
 function _getImgLib(){ try{ return JSON.parse(localStorage.getItem('spotImgLibrary')||'[]'); }catch(e){ return []; } }
 function _setImgLib(a){ try{ localStorage.setItem('spotImgLibrary', JSON.stringify(a)); return true; }catch(e){ return false; } }
 function renderImgLibrary(){
