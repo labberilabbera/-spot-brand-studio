@@ -3089,6 +3089,7 @@ function removeMember(id) {
   const idx = TEAM_MEMBERS.findIndex(m => m.id === id);
   if (idx === -1) return;
   const member = TEAM_MEMBERS[idx];
+  if (!confirm('Är du säker på att du vill ta bort ' + member.name + '?')) return;
   const finish = function(){ TEAM_MEMBERS.splice(idx,1); renderTeam(); showToast(`Tog bort ${member.name}`,'ok'); };
   if (member.username) {
     fetch('/api/team/remove', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username: member.username}) })
