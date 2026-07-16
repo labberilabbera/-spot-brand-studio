@@ -841,6 +841,10 @@ textarea.field-input{resize:none;line-height:1.5}
       <div style="font-size:11px;font-weight:600;color:#6b7280;margin-bottom:4px;text-transform:uppercase">E-post</div>
       <input id="newMemberEmail" placeholder="namn@foretag.se" type="email" style="width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:13px;outline:none;font-family:inherit">
     </div>
+    <div style="margin-bottom:12px">
+      <div style="font-size:11px;font-weight:600;color:#6b7280;margin-bottom:4px;text-transform:uppercase">Lösenord</div>
+      <input id="newMemberPassword" placeholder="Minst 4 tecken" type="password" style="width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:13px;outline:none;font-family:inherit">
+    </div>
     <div style="margin-bottom:20px">
       <div style="font-size:11px;font-weight:600;color:#6b7280;margin-bottom:4px;text-transform:uppercase">Roll</div>
       <select id="newMemberRole" style="width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:13px;outline:none;font-family:inherit;background:#fff">
@@ -3068,12 +3072,22 @@ function changeMemberRole(id, newRole) {
 
 function removeMember(id) {
   const idx = TEAM_MEMBERS.findIndex(m => m.id === id);
-  if (idx > -1) { const name = TEAM_MEMBERS[idx].name; TEAM_MEMBERS.splice(idx,1); renderTeam(); showToast(`Tog bort ${name}`,'ok'); }
+  if (idx === -1) return;
+  const member = TEAM_MEMBERS[idx];
+  const finish = function(){ TEAM_MEMBERS.splice(idx,1); renderTeam(); showToast(`Tog bort ${member.name}`,'ok'); };
+  if (member.username) {
+    fetch('/api/team/remove', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username: member.username}) })
+      .then(function(){ finish(); })
+      .catch(function(){ finish(); });
+  } else {
+    finish();
+  }
 }
 
 function openAddMember() {
   document.getElementById('newMemberName').value = '';
   document.getElementById('newMemberEmail').value = '';
+  document.getElementById('newMemberPassword').value = '';
   document.getElementById('newMemberRole').value = 'editor';
   document.getElementById('addMemberModal').style.display = 'flex';
 }
@@ -3083,15 +3097,23 @@ function closeAddMember() { document.getElementById('addMemberModal').style.disp
 function addMember() {
   const name  = document.getElementById('newMemberName').value.trim();
   const email = document.getElementById('newMemberEmail').value.trim();
+  const password = document.getElementById('newMemberPassword').value;
   const role  = document.getElementById('newMemberRole').value;
-  if (!name || !email) { showToast('Fyll i namn och e-post','err'); return; }
-  const initials = name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-  const colors = ['#b31e59','#2563eb','#7c3aed','#059669','#d97706'];
-  const color  = colors[TEAM_MEMBERS.length % colors.length];
-  TEAM_MEMBERS.push({id: Date.now(), name, email, role, color, initials});
-  closeAddMember();
-  renderTeam();
-  showToast(`✅ ${name} bjöd in som ${ROLE_LABEL[role]}`);
+  if (!name || !email || !password) { showToast('Fyll i namn, e-post och lösenord','err'); return; }
+  if (password.length < 4) { showToast('Lösenordet måste vara minst 4 tecken','err'); return; }
+  fetch('/api/team/invite', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name,email,password,role}) })
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, data:d}; }); })
+    .then(function(res){
+      if (!res.ok) { showToast('⚠️ ' + (res.data.error||'Kunde inte skapa kontot')); return; }
+      const initials = name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+      const colors = ['#b31e59','#2563eb','#7c3aed','#059669','#d97706'];
+      const color  = colors[TEAM_MEMBERS.length % colors.length];
+      TEAM_MEMBERS.push({id: Date.now(), name, email, role, color, initials, username: res.data.username});
+      closeAddMember();
+      renderTeam();
+      showToast(`✅ ${name} kan nu logga in som "${res.data.username}"`);
+    })
+    .catch(function(){ showToast('⚠️ Kunde inte skapa kontot'); });
 }
 
 // ════════════════════════════════════════════════════════
