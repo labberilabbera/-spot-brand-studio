@@ -914,7 +914,19 @@ const S = {
 };
 (function(){ try{ var _as=JSON.parse(localStorage.getItem('spotAppState')||'null'); if(_as){ if(Array.isArray(_as.reviewQueue))S.reviewQueue=_as.reviewQueue; if(Array.isArray(_as.publishedPosts))S.publishedPosts=_as.publishedPosts; if(_as.archiveOverride)S.archiveOverride=_as.archiveOverride; } }catch(e){} })();
 function _saveAppState(){ try{ localStorage.setItem('spotAppState', JSON.stringify({reviewQueue:S.reviewQueue, publishedPosts:S.publishedPosts, archiveOverride:S.archiveOverride})); }catch(e){} }
-function _loadUserInfo(){ fetch('/api/me').then(function(r){ return r.json(); }).then(function(u){ var el=document.getElementById('avatarInitials'); if(el && u.initials) el.textContent=u.initials; var el2=document.getElementById('avatarInitials2'); if(el2 && u.initials) el2.textContent=u.initials; var btn=document.getElementById('avatarBtn'); if(btn && u.firstName) btn.title=u.firstName+' '+u.lastName; var nameEl=document.getElementById('userFullName'); if(nameEl) nameEl.textContent=(u.firstName||'')+' '+(u.lastName||''); }).catch(function(){}); }
+var CURRENT_ROLE = 'admin';
+function _loadUserInfo(){ fetch('/api/me').then(function(r){ return r.json(); }).then(function(u){ var el=document.getElementById('avatarInitials'); if(el && u.initials) el.textContent=u.initials; var el2=document.getElementById('avatarInitials2'); if(el2 && u.initials) el2.textContent=u.initials; var btn=document.getElementById('avatarBtn'); if(btn && u.firstName) btn.title=u.firstName+' '+u.lastName; var nameEl=document.getElementById('userFullName'); if(nameEl) nameEl.textContent=(u.firstName||'')+' '+(u.lastName||''); CURRENT_ROLE = u.role || 'admin'; applyRolePermissions(); }).catch(function(){}); }
+function applyRolePermissions(){
+  var isAdmin = CURRENT_ROLE === 'admin';
+  var isGranskare = CURRENT_ROLE === 'granskare';
+  var createNav = document.querySelector('.nav-btn[onclick*="navigate(\'create\')"]');
+  if (createNav) createNav.style.display = isGranskare ? 'none' : '';
+  var inviteBtn = document.querySelector('button[onclick="openAddMember()"]');
+  if (inviteBtn) inviteBtn.style.display = isAdmin ? '' : 'none';
+  document.querySelectorAll('button[onclick^="removeMember("]').forEach(function(b){ b.style.display = isAdmin ? '' : 'none'; });
+  document.querySelectorAll('.approve-btn, button[onclick^="approvePost("]').forEach(function(b){ b.style.display = isAdmin ? '' : 'none'; });
+  document.querySelectorAll('button[onclick^="rejectPost("]').forEach(function(b){ b.style.display = isGranskare ? 'none' : ''; });
+}
 _loadUserInfo();
 function _getImgLib(){ try{ return JSON.parse(localStorage.getItem('spotImgLibrary')||'[]'); }catch(e){ return []; } }
 function _setImgLib(a){ try{ localStorage.setItem('spotImgLibrary', JSON.stringify(a)); return true; }catch(e){ return false; } }
@@ -1366,6 +1378,7 @@ function checkCompliance(post) {
 //  NAVIGATION
 // ════════════════════════════════════════════════════════
 function navigate(view) {
+  setTimeout(applyRolePermissions, 0);
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('v-' + view).classList.add('active');
@@ -2195,6 +2208,7 @@ function updateBadge() {
 }
 function renderReview() {
   updateBadge();
+  setTimeout(applyRolePermissions, 0);
   const grid = document.getElementById('reviewGrid');
   if (S.reviewQueue.length === 0) {
     grid.innerHTML = '<div style="grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:50vh;gap:12px;color:#9ca3af"><div style="font-size:48px">✅</div><div style="font-weight:500">Granskningskön är tom</div><div style="font-size:13px">Skapa inlägg och välj "Lägg till granskning"</div></div>';
@@ -2230,6 +2244,7 @@ function navigateReview(dir) {
   if (next) { S.selectedReviewId = next.id; S.editMode = false; renderReview(); renderDetailPanel(); }
 }
 function renderDetailPanel() {
+  setTimeout(applyRolePermissions, 0);
   const panel = document.getElementById('detailPanel');
   const post = S.reviewQueue.find(p => p.id === S.selectedReviewId);
   if (!post) { panel.style.display = 'none'; return; }
@@ -3025,6 +3040,7 @@ const ROLE_LABEL = {admin:'👑 Admin', editor:'✍️ Redaktör', viewer:'👁 
 const ROLE_CLASS = {admin:'role-admin', editor:'role-editor', viewer:'role-viewer'};
 
 function renderTeam() {
+  setTimeout(applyRolePermissions, 0);
   document.getElementById('memberCount').textContent = `${TEAM_MEMBERS.length} medlemmar`;
   document.getElementById('memberList').innerHTML = TEAM_MEMBERS.map(m => `
     <div class="member-row">
