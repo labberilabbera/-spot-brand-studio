@@ -3210,6 +3210,19 @@ function renderAdvocacy() {
 }
 
 let _sharePost = null;
+function _dataUrlToBlob(dataUrl){ var parts=dataUrl.split(','); var mimeMatch=/data:(.*?);base64/.exec(parts[0]); var mime=mimeMatch?mimeMatch[1]:'image/png'; var bstr=atob(parts[1]); var n=bstr.length; var u8=new Uint8Array(n); while(n--){ u8[n]=bstr.charCodeAt(n); } return new Blob([u8], {type:mime}); }
+async function _copyTextAndImage(text, imageUrl){
+  try {
+    if (navigator.clipboard && window.ClipboardItem && imageUrl && imageUrl.indexOf('data:') === 0) {
+      var blob = _dataUrlToBlob(imageUrl);
+      var textBlob = new Blob([text], {type:'text/plain'});
+      await navigator.clipboard.write([ new ClipboardItem({ 'text/plain': textBlob, [blob.type]: blob }) ]);
+      return true;
+    }
+  } catch (e) {}
+  try { await navigator.clipboard.writeText(text); } catch (e) {}
+  return false;
+}
 function quickShareAdvocacy(idx, posts) {
   const p = (posts||[])[idx];
   if (!p) return;
@@ -3228,14 +3241,16 @@ function quickShareAdvocacy(idx, posts) {
     instagram: null
   };
   const url = urls[match.platform];
-  navigator.clipboard.writeText(fullText).catch(()=>{});
-  if (url) {
-    window.open(url, '_blank', 'noopener,width=600,height=500');
-    if (typeof showToast==='function') showToast('📋 Text kopierad — klistra in och tryck Publicera i rutan som öppnas');
-  } else {
-    if (typeof showToast==='function') showToast('📋 Text kopierad — klistra in i '+match.platform);
-    window.open(_mcUrl(match), '_blank', 'noopener');
-  }
+  const imgUrl = p.imageUrl || p.aiImageUrl || null;
+  _copyTextAndImage(fullText, imgUrl).then(function(gotBoth){
+    if (url) {
+      window.open(url, '_blank', 'noopener,width=600,height=500');
+      if (typeof showToast==='function') showToast(gotBoth ? '📋 Text + bild kopierade — klistra in båda (Ctrl+V) i rutan' : '📋 Text kopierad — klistra in och tryck Publicera i rutan som öppnas');
+    } else {
+      if (typeof showToast==='function') showToast(gotBoth ? '📋 Text + bild kopierade — klistra in i '+match.platform : '📋 Text kopierad — klistra in i '+match.platform);
+      window.open(_mcUrl(match), '_blank', 'noopener');
+    }
+  });
 }
 function openShareModal(idx, posts) {
   const p = (posts||[])[idx];
