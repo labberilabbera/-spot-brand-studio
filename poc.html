@@ -3228,11 +3228,12 @@ function quickShareAdvocacy(idx, posts) {
     instagram: null
   };
   const url = urls[match.platform];
+  navigator.clipboard.writeText(fullText).catch(()=>{});
   if (url) {
     window.open(url, '_blank', 'noopener,width=600,height=500');
-    if (typeof showToast==='function') showToast('Delar till '+match.handle);
+    if (typeof showToast==='function') showToast('📋 Text kopierad — klistra in och tryck Publicera i rutan som öppnas');
   } else {
-    navigator.clipboard.writeText(fullText).then(()=>{ if(typeof showToast==='function') showToast('📋 Text kopierad — klistra in i '+match.platform); }).catch(()=>{});
+    if (typeof showToast==='function') showToast('📋 Text kopierad — klistra in i '+match.platform);
     window.open(_mcUrl(match), '_blank', 'noopener');
   }
 }
