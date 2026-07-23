@@ -3202,7 +3202,7 @@ function renderAdvocacy() {
         </div>
         <div class="adv-post-title">${p.title||'(Utan titel)'}</div>
         <div class="adv-post-content">${p.content||''}</div>
-        <button class="adv-share-btn" onclick='quickShareAdvocacy(${i}, window._advPosts)'>🔗 Dela på min profil</button>
+        <button class="adv-share-btn" onclick='quickShareAdvocacy(${i}, window._advPosts)'>🔗 Dela på min profil</button><button class="adv-share-btn" style="background:#374151" onclick='downloadAdvocacyPost(${i}, window._advPosts)'>⬇️ Ladda ner inlägg</button>
       </div>
     </div>`;
   }).join('');
@@ -3222,6 +3222,22 @@ async function _copyTextAndImage(text, imageUrl){
   } catch (e) {}
   try { await navigator.clipboard.writeText(text); } catch (e) {}
   return false;
+}
+function downloadAdvocacyPost(idx, posts){
+  const p = (posts||[])[idx];
+  if (!p) return;
+  const imgUrl = p.imageUrl || p.aiImageUrl || null;
+  if (!imgUrl) { if (typeof showToast==='function') showToast('Ingen bild att ladda ner för det här inlägget.'); return; }
+  const chLabel = (typeof CH_LABEL!=='undefined' && CH_LABEL[p.channel]) ? CH_LABEL[p.channel].replace(/[^a-zA-Z0-9]/g,'') : (p.channel||'post');
+  const titleSlug = (p.title||'inlagg').toLowerCase().replace(/[åä]/g,'a').replace(/ö/g,'o').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'').slice(0,40);
+  const ext = imgUrl.indexOf('data:')===0 ? ((/data:image\/(\w+)/.exec(imgUrl)||[])[1]||'png') : ((/\.(\w+)$/.exec(imgUrl)||[])[1]||'png');
+  const a = document.createElement('a');
+  a.href = imgUrl;
+  a.download = chLabel + '-' + titleSlug + '.' + (ext==='jpeg'?'jpg':ext);
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  const tags = (p.hashtags||[]).map(t=>'#'+t.replace(/^#/,'')).join(' ');
+  const fullText = `${p.title||''}\n\n${p.content||''}\n\n${tags}${p.cta?'\n\n'+p.cta:''}`;
+  navigator.clipboard.writeText(fullText).then(()=>{ if(typeof showToast==='function') showToast('⬇️ Bild nedladdad (märkt med kanal) + text kopierad'); }).catch(()=>{ if(typeof showToast==='function') showToast('⬇️ Bild nedladdad (märkt med kanal)'); });
 }
 function quickShareAdvocacy(idx, posts) {
   const p = (posts||[])[idx];
