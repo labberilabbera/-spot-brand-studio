@@ -3193,9 +3193,9 @@ function renderAdvocacy() {
   list.innerHTML = demo.map((p, i) => {
     const chGrad = CH_GRAD[p.channel] || 'linear-gradient(135deg,#b31e59,#82093e)';
     const chLbl  = CH_LABEL[p.channel] || p.channel;
-    const mockPost = { channel: p.channel, layout:'gradient', title:p.title||'', content:p.content||'', hashtags:(p.hashtags||[]), cta:p.cta||'' };
+    const mockPost = { channel: p.channel, layout:(p.layout||'gradient'), title:p.title||'', content:p.content||'', hashtags:(p.hashtags||[]), cta:p.cta||'', imageUrl:(p.imageUrl||p.aiImageUrl||null), aiImageUrl:(p.aiImageUrl||null), imgPos:(p.imgPos||null) };
     return `<div class="adv-post-row">
-      <div class="adv-post-thumb">${getPostImageHTML(mockPost)}</div>
+      <div class="adv-post-thumb" style="cursor:pointer" onclick='advZoomPost(${i})'>${getPostImageHTML(mockPost)}</div>
       <div class="adv-post-info">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
           <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;color:#fff;background:${chGrad}">${chLbl}</span>
@@ -3222,6 +3222,13 @@ async function _copyTextAndImage(text, imageUrl){
   } catch (e) {}
   try { await navigator.clipboard.writeText(text); } catch (e) {}
   return false;
+}
+function advZoomPost(idx){
+  const p = (window._advPosts||[])[idx];
+  if (!p) return;
+  S._lbSingle = { channel: p.channel, layout:(p.layout||'gradient'), title:p.title||'', content:p.content||'', hashtags:(p.hashtags||[]), cta:p.cta||'', author:'', imageUrl:(p.imageUrl||p.aiImageUrl||null), aiImageUrl:(p.aiImageUrl||null), imgPos:(p.imgPos||null) };
+  renderLightbox();
+  document.getElementById('lightbox').classList.add('open');
 }
 function downloadAdvocacyPost(idx, posts){
   const p = (posts||[])[idx];
