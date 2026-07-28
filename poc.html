@@ -1641,7 +1641,7 @@ function renderPreview() {
   const mockPost = { channel: ch, layout: 'gradient', ...p };
   body.innerHTML = `
     <div style="width:220px">
-      <div style="border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15);aspect-ratio:'+_arFor(mockPost.channel)+'">
+      <div style="border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15);aspect-ratio:${_arFor(mockPost.channel)}">
         ${getPostImageHTML(mockPost)}
       </div>
       <div style="font-size:11px;color:#9ca3af;text-align:center;margin-top:8px;font-family:Helvetica,Arial,sans-serif">${CH_LABEL[ch]} · spot.</div>
@@ -2045,7 +2045,7 @@ function renderProposalCards(ch) {
       const cardLayouts = ['studio','case','louisiana'];
       const mockPost = { channel: ch, layout: cardLayouts[i] || 'gradient', title: p.title||'', content: p.content||'', hashtags: (p.hashtags||[]).map(t=>t.replace(/^#/,'')), cta: p.cta||'', imageUrl: activeImageUrl(), imageStyle: S.imageStyle };
       return `<div class="ai-prop-card ${i===selectedIdx?'selected':''}" onclick="selectProposalCard('${ch}',${i})">
-        <div class="ai-prop-thumb" style="position:relative;aspect-ratio:'+_arFor(ch)+'">
+        <div class="ai-prop-thumb" style="position:relative;aspect-ratio:${_arFor(ch)}">
           ${getPostImageHTML(mockPost)}
           ${S._aiImageLoading ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;z-index:5"><div style="width:22px;height:22px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite"></div><div style="font-size:9px;color:#fff;font-weight:600">Skapar bild…</div></div>` : ''}
           <button class="prop-zoom-btn" title="Förstora" onclick="event.stopPropagation();openProposalZoom('${ch}',${i})">⤢</button>
@@ -2118,7 +2118,7 @@ function updateManualPreview() {
   if (panelTitle) panelTitle.textContent = 'Förhandsvisning';
   body.innerHTML = `
     <div style="width:100%">
-      <div style="border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15);aspect-ratio:'+_arFor(mockPost.channel)+'">
+      <div style="border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15);aspect-ratio:${_arFor(mockPost.channel)}">
         ${getPostImageHTML(mockPost)}
       </div>
       <div style="font-size:11px;color:#9ca3af;text-align:center;margin-top:8px">${CH_LABEL[S.manualChannel]}</div>
