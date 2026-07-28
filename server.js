@@ -62,6 +62,34 @@ app.post('/login', async (req, res) => {
 })
 app.post('/logout', (req, res) => { delete sessions[getToken(req)]; res.setHeader('Set-Cookie', 'spot_session=; Path=/; Max-Age=0'); res.json({ ok: true }) })
 app.get('/api/me', auth, (req, res) => { const s = sessions[getToken(req)] || {}; const firstName = s.firstName || 'Spot'; const lastName = s.lastName || 'Admin'; const role = s.role || 'admin'; const initials = (firstName[0]||'') + (lastName[0]||''); res.json({ firstName, lastName, role, initials: initials.toUpperCase() }) })
+async function ensureChannelsTable() { await getAuthPool().query("CREATE TABLE IF NOT EXISTS user_channels (username TEXT, platform TEXT, handle TEXT, PRIMARY KEY (username, platform))") }
+app.get('/api/channels', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    await ensureChannelsTable()
+    const r = await getAuthPool().query('SELECT platform, handle FROM user_channels WHERE username=$1', [s.u])
+    res.json({ channels: r.rows })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.post('/api/channels/add', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    const { platform, handle } = req.body || {}
+    if (!platform || !handle) return res.status(400).json({ error: 'platform och handle krävs' })
+    await ensureChannelsTable()
+    await getAuthPool().query('INSERT INTO user_channels (username,platform,handle) VALUES ($1,$2,$3) ON CONFLICT (username,platform) DO UPDATE SET handle=$3', [s.u, platform, handle])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.post('/api/channels/remove', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    const { platform } = req.body || {}
+    await ensureChannelsTable()
+    await getAuthPool().query('DELETE FROM user_channels WHERE username=$1 AND platform=$2', [s.u, platform])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
 app.post('/api/team/invite', auth, async (req, res) => {
   const s = sessions[getToken(req)] || {}
   if ((s.role || 'admin') !== 'admin') return res.status(403).json({ error: 'Endast admin kan bjuda in medlemmar' })
