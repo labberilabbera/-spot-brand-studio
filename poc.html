@@ -564,7 +564,7 @@ textarea.field-input{resize:none;line-height:1.5}
           </div>
           <div id="imgEditControls" style="display:none;flex-direction:column;gap:6px;margin-top:8px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#6b7280;font-weight:600">Zoom</span><input type="range" id="imgZoom" min="1" max="3" step="0.05" value="1" oninput="setImgZoom(this.value)" style="flex:1"></div><div id="imgRepromptRow" style="display:none;gap:6px"><input id="imgReprompt" placeholder="Beskriv en ändring av bilden (valfritt)..." style="flex:1;font-size:12px;border:1.5px solid #e5e7eb;border-radius:8px;padding:6px 8px;font-family:inherit"><button onclick="repromptImage()" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:none;background:var(--m);color:#fff;cursor:pointer;white-space:nowrap">🎨 Ny bild</button></div></div>
           <input type="file" id="imgFileInput" accept="image/*" style="display:none" onchange="handleImgSelect(event)">
-          <button id="imgRemoveBtn" onclick="removeImg()" style="display:none;font-size:12px;color:#ef4444;border:1.5px solid #fecaca;border-radius:8px;padding:5px 12px;background:#fff;cursor:pointer;align-self:flex-start">✕ Ta bort bild</button>
+          <div style="display:flex;gap:8px"><button id="imgSwapBtn" onclick="document.getElementById('imgFileInput').click()" style="display:none;font-size:12px;color:#374151;border:1.5px solid #e5e7eb;border-radius:8px;padding:5px 12px;background:#fff;cursor:pointer">🔄 Byt bild</button><button id="imgRemoveBtn" onclick="removeImg()" style="display:none;font-size:12px;color:#ef4444;border:1.5px solid #fecaca;border-radius:8px;padding:5px 12px;background:#fff;cursor:pointer">✕ Ta bort bild</button></div>
         </div>
 
         <!-- HASHTAGS & CTA -->
@@ -1078,7 +1078,7 @@ const MOCK_PROPOSALS = {
 //  LAYOUT RENDERER
 // ════════════════════════════════════════════════════════
 // Returns object-position CSS value — reads from post if available, else global drag state
-function applyImgPreviewTransform(){var pv=document.getElementById("imgPreview");if(!pv)return;var p=S._imgPos||{x:0,y:0,zoom:1};var z=(p.zoom||1)*1.15;var mx=(1-1/z)*50;var x=Math.max(-mx,Math.min(mx,p.x||0));var y=Math.max(-mx,Math.min(mx,p.y||0));pv.style.objectPosition="center";pv.style.transform="scale("+z.toFixed(3)+") translate("+x.toFixed(2)+"%,"+y.toFixed(2)+"%)";}
+function applyImgPreviewTransform(){var pv=document.getElementById("imgPreview");if(!pv)return;var p=S._imgPos||{x:0,y:0,zoom:1};var z=(p.zoom||1);var mx=z>1?(1-1/z)*50:0;var x=Math.max(-mx,Math.min(mx,p.x||0));var y=Math.max(-mx,Math.min(mx,p.y||0));pv.style.objectPosition="center";pv.style.transform="scale("+z.toFixed(3)+") translate("+x.toFixed(2)+"%,"+y.toFixed(2)+"%)";}
 function setImgZoom(v){if(!S._imgPos)S._imgPos={x:0,y:0,zoom:1};S._imgPos.zoom=parseFloat(v)||1;applyImgPreviewTransform();if(window._aiProposals&&window._allChannelProposals){renderProposalCards(window._activeProposalTab||S.manualChannel);}else{updateManualPreview();}}
 function repromptImage(){var t=document.getElementById("imgReprompt");var extra=t?t.value.trim():"";var base=S._aiImageBrief||S._lastBrief||"";if(!base&&!extra){showToast("Generera förslag först eller skriv en beskrivning.");return;}if(S._uploadedImageUrl){showToast("Ta bort den uppladdade bilden för att använda AI-bild.");return;}var brief=extra?(base?(base+". Ändring: "+extra):extra):base;generateBrandImage(brief,true);}
 function _imgObjPos(post) {
@@ -1688,7 +1688,7 @@ function loadImgFile(file) {
     preview.style.objectPosition = '50% 50%';
     document.getElementById('imgUploadArea').style.display = 'none';
     document.getElementById('imgRepoFrame').style.display = 'block';var _ec=document.getElementById('imgEditControls');if(_ec)_ec.style.display='flex';var _z=document.getElementById('imgZoom');if(_z)_z.value=1;applyImgPreviewTransform();
-    document.getElementById('imgRemoveBtn').style.display = 'inline-flex';
+    document.getElementById('imgRemoveBtn').style.display = 'inline-flex';var _sw0=document.getElementById('imgSwapBtn');if(_sw0)_sw0.style.display='inline-flex';
     // Hide drag hint after 2s
     setTimeout(() => {
       const hint = document.getElementById('imgDragHint');
@@ -1777,6 +1777,7 @@ function removeImg() {
   if (prev) { prev.src = ''; }
   if (placeholder) placeholder.style.display = '';
   if (removeBtn) removeBtn.style.display = 'none';
+  const swapBtn = document.getElementById('imgSwapBtn'); if (swapBtn) swapBtn.style.display = 'none';
   if (area) { area.style.display = 'flex'; area.style.borderColor = '#e5e7eb'; }
   const frame = document.getElementById('imgRepoFrame');
   if (frame) frame.style.display = 'none';
@@ -1969,7 +1970,7 @@ async function generateBrandImage(brief, force) {
     if (!res.ok || !data.imageUrl) throw new Error(data.error || 'Bild misslyckades');
     S._aiImageUrl = data.imageUrl;
     S._aiImageBrief = brief;
-    S._aiImageStyle = S.imageStyle;if(!S._uploadedImageUrl){var _p=document.getElementById("imgPreview"),_f=document.getElementById("imgRepoFrame"),_u=document.getElementById("imgUploadArea");if(_p&&_f){_p.src=data.imageUrl;if(!S._imgPos)S._imgPos={x:50,y:50};_p.style.objectPosition=S._imgPos.x+"% "+S._imgPos.y+"%";_f.style.display="block";if(_u)_u.style.display="none";var _ec=document.getElementById("imgEditControls");if(_ec)_ec.style.display="flex";var _zz=document.getElementById("imgZoom");if(_zz)_zz.value=((S._imgPos&&S._imgPos.zoom)||1);applyImgPreviewTransform();var _h=document.getElementById("imgDragHint");if(_h){_h.style.opacity="1";_h.textContent="Dra för att flytta bilden";}}var _b=document.getElementById("regenImgBtn");if(_b)_b.textContent="🎨 Ny bild";}
+    S._aiImageStyle = S.imageStyle;if(!S._uploadedImageUrl){var _p=document.getElementById("imgPreview"),_f=document.getElementById("imgRepoFrame"),_u=document.getElementById("imgUploadArea");if(_p&&_f){_p.src=data.imageUrl;if(!S._imgPos)S._imgPos={x:50,y:50};_p.style.objectPosition=S._imgPos.x+"% "+S._imgPos.y+"%";_f.style.display="block";if(_u)_u.style.display="none";var _ec=document.getElementById("imgEditControls");if(_ec)_ec.style.display="flex";var _zz=document.getElementById("imgZoom");if(_zz)_zz.value=((S._imgPos&&S._imgPos.zoom)||1);applyImgPreviewTransform();var _h=document.getElementById("imgDragHint");if(_h){_h.style.opacity="1";_h.textContent="Dra för att flytta bilden";}}var _b=document.getElementById("regenImgBtn");if(_b)_b.textContent="🎨 Ny bild";var _rb2=document.getElementById("imgRemoveBtn"),_sw2=document.getElementById("imgSwapBtn");if(_rb2)_rb2.style.display="inline-flex";if(_sw2)_sw2.style.display="inline-flex";}
     showToast('🖼️ Varumärkesbild klar!');
   } catch (e) {
     showToast('⚠️ Kunde inte skapa bild: ' + e.message);
