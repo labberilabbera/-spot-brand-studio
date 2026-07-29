@@ -3269,10 +3269,9 @@ function quickShareAdvocacy(idx, posts) {
   if (!p) return;
   const chans = _getMyCh();
   const match = chans.find(c => c.platform === (p.channel||'linkedin'));
-  if (!match) { openShareModal(idx, posts); return; }
-  const tags0 = (p.hashtags||[]).map(t=>'#'+t.replace(/^#/,'')).join(' ');
-  const fullText0 = `${p.title||''}\n\n${p.content||''}\n\n${tags0}${p.cta?'\n\n'+p.cta:''}`;
-  if (match.platform === 'linkedin' && _liConnected) {
+  if ((p.channel||'') === 'linkedin' && _liConnected) {
+    const tags0 = (p.hashtags||[]).map(t=>'#'+t.replace(/^#/,'')).join(' ');
+    const fullText0 = `${p.title||''}\n\n${p.content||''}\n\n${tags0}${p.cta?'\n\n'+p.cta:''}`;
     const imgUrlLi = p.imageUrl || p.aiImageUrl || null;
     if (typeof showToast==='function') showToast('📤 Publicerar på LinkedIn…');
     fetch('/api/linkedin/publish', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: fullText0, imageDataUrl: imgUrlLi }) })
@@ -3284,6 +3283,7 @@ function quickShareAdvocacy(idx, posts) {
       .catch(function(){ if (typeof showToast==='function') showToast('⚠️ Kunde inte publicera'); });
     return;
   }
+  if (!match) { openShareModal(idx, posts); return; }
   const tags = (p.hashtags||[]).map(t=>'#'+t.replace(/^#/,'')).join(' ');
   const fullText = `${p.title||''}\n\n${p.content||''}\n\n${tags}${p.cta?'\n\n'+p.cta:''}`;
   const encodedText = encodeURIComponent(fullText.slice(0,500));
