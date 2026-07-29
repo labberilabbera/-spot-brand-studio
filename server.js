@@ -154,6 +154,115 @@ app.post('/api/generate', auth, async (req, res) => { try { const { channels = [
 app.post('/api/generate-image', auth, async (req, res) => { try { const { brief = '', style = 'modern' } = req.body; const apiKey = process.env.GEMINI_API_KEY; if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY saknas' }); const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=' + apiKey, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: 'CRITICAL RULE: absolutely NO text, no letters, no words, no numbers, no captions, no logos and no typography anywhere in the image - it must be a purely visual photo with zero written characters. Professional social media image spot. creative studio Halmstad. Style: ' + style + '. Brief: ' + (brief || 'creative studio') + '.' }] }], generationConfig: { responseModalities: ['IMAGE', 'TEXT'] } }) }); const data = await r.json(); if (data.error) throw new Error('Gemini: ' + data.error.message); const imgPart = (data.candidates?.[0]?.content?.parts || []).find(p => p.inlineData?.mimeType?.startsWith('image/')); if (imgPart) return res.json({ imageUrl: 'data:' + imgPart.inlineData.mimeType + ';base64,' + imgPart.inlineData.data }); res.json({ imageUrl: 'https://placehold.co/1080x1080/c8003c/ffffff?text=spot.' }) } catch (e) { res.status(500).json({ error: e.message }) } })
 app.post('/api/save-post', auth, async (req, res) => { try { const { Pool } = require('pg'); const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }); await pool.query('CREATE TABLE IF NOT EXISTS posts (id TEXT PRIMARY KEY, data JSONB, created_at TIMESTAMPTZ DEFAULT NOW())'); const post = req.body; await pool.query('INSERT INTO posts (id,data) VALUES ($1,$2) ON CONFLICT (id) DO UPDATE SET data=$2,created_at=NOW()', [post.id || Date.now().toString(), JSON.stringify(post)]); res.json({ saved: true }) } catch (e) { res.status(500).json({ error: e.message }) } })
 app.get('/api/published-posts', auth, async (req, res) => { try { const { Pool } = require('pg'); const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }); await pool.query('CREATE TABLE IF NOT EXISTS posts (id TEXT PRIMARY KEY, data JSONB, created_at TIMESTAMPTZ DEFAULT NOW())'); const result = await pool.query("SELECT data FROM posts WHERE data->>'status' IN ('published','archived') ORDER BY created_at DESC LIMIT 200"); res.json({ posts: result.rows.map(r => r.data) }) } catch (e) { res.status(500).json({ error: e.message }) } })
+async function ensureLinkedInTable() { await getAuthPool().query("CREATE TABLE IF NOT EXISTS linkedin_accounts (username TEXT PRIMARY KEY, access_token TEXT, expires_at BIGINT, li_sub TEXT, li_name TEXT)") }
+app.get('/auth/linkedin', auth, (req, res) => {
+  const s = sessions[getToken(req)] || {}
+  const state = makeToken()
+  s.liState = state
+  const redirectUri = req.protocol + '://' + req.get('host') + '/auth/linkedin/callback'
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: process.env.LINKEDIN_CLIENT_ID || '',
+    redirect_uri: redirectUri,
+    state,
+    scope: 'openid profile email w_member_social'
+  })
+  res.redirect('https://www.linkedin.com/oauth/v2/authorization?' + params.toString())
+})
+app.get('/auth/linkedin/callback', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    const { code, state } = req.query
+    if (!code || state !== s.liState) return res.send('<p>Ogiltig eller utgången LinkedIn-inloggning. <a href="/">Tillbaka</a></p>')
+    const redirectUri = req.protocol + '://' + req.get('host') + '/auth/linkedin/callback'
+    const tokenRes = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+        client_id: process.env.LINKEDIN_CLIENT_ID || '',
+        client_secret: process.env.LINKEDIN_CLIENT_SECRET || ''
+      })
+    })
+    const tokenData = await tokenRes.json()
+    if (!tokenData.access_token) return res.send('<p>Kunde inte logga in med LinkedIn: ' + (tokenData.error_description || tokenData.error || 'okänt fel') + '. <a href="/">Tillbaka</a></p>')
+    const meRes = await fetch('https://api.linkedin.com/v2/userinfo', { headers: { Authorization: 'Bearer ' + tokenData.access_token } })
+    const me = await meRes.json()
+    await ensureLinkedInTable()
+    const expiresAt = Date.now() + (tokenData.expires_in || 5000) * 1000
+    await getAuthPool().query(
+      'INSERT INTO linkedin_accounts (username,access_token,expires_at,li_sub,li_name) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (username) DO UPDATE SET access_token=$2, expires_at=$3, li_sub=$4, li_name=$5',
+      [s.u, tokenData.access_token, expiresAt, me.sub, me.name || '']
+    )
+    res.redirect('/?linkedin=connected')
+  } catch (e) {
+    res.send('<p>Fel vid LinkedIn-inloggning: ' + e.message + '. <a href="/">Tillbaka</a></p>')
+  }
+})
+app.get('/api/linkedin/status', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    await ensureLinkedInTable()
+    const r = await getAuthPool().query('SELECT li_name, expires_at FROM linkedin_accounts WHERE username=$1', [s.u])
+    if (!r.rows.length) return res.json({ connected: false })
+    res.json({ connected: true, name: r.rows[0].li_name })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.post('/api/linkedin/disconnect', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    await ensureLinkedInTable()
+    await getAuthPool().query('DELETE FROM linkedin_accounts WHERE username=$1', [s.u])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.post('/api/linkedin/publish', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    const { text, imageDataUrl } = req.body || {}
+    if (!text) return res.status(400).json({ error: 'Text saknas' })
+    await ensureLinkedInTable()
+    const r = await getAuthPool().query('SELECT access_token, li_sub FROM linkedin_accounts WHERE username=$1', [s.u])
+    if (!r.rows.length) return res.status(400).json({ error: 'LinkedIn är inte anslutet. Anslut kontot först.' })
+    const { access_token, li_sub } = r.rows[0]
+    const author = 'urn:li:person:' + li_sub
+    let mediaAsset = null
+    if (imageDataUrl && imageDataUrl.indexOf('data:') === 0) {
+      const regRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + access_token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registerUploadRequest: { recipes: ['urn:li:digitalmediaRecipe:feedshare-image'], owner: author, serviceRelationships: [{ relationshipType: 'OWNER', identifier: 'urn:li:userGeneratedContent' }] } })
+      })
+      const regData = await regRes.json()
+      const uploadUrl = regData.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'].uploadUrl
+      mediaAsset = regData.value.asset
+      const base64 = imageDataUrl.split(',')[1]
+      const buffer = Buffer.from(base64, 'base64')
+      await fetch(uploadUrl, { method: 'PUT', headers: { Authorization: 'Bearer ' + access_token }, body: buffer })
+    }
+    const postBody = {
+      author,
+      lifecycleState: 'PUBLISHED',
+      specificContent: {
+        'com.linkedin.ugc.ShareContent': {
+          shareCommentary: { text },
+          shareMediaCategory: mediaAsset ? 'IMAGE' : 'NONE',
+          media: mediaAsset ? [{ status: 'READY', media: mediaAsset }] : undefined
+        }
+      },
+      visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' }
+    }
+    const postRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + access_token, 'Content-Type': 'application/json', 'X-Restli-Protocol-Version': '2.0.0' },
+      body: JSON.stringify(postBody)
+    })
+    if (!postRes.ok) { const errText = await postRes.text(); return res.status(500).json({ error: 'LinkedIn avvisade inlägget: ' + errText }) }
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
 app.listen(PORT, () => console.log('spot. running on ' + PORT))
 const LOGIN_HTML = '<!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"/><title>spot.</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Segoe UI,sans-serif;background:#0f0f0f;min-height:100vh;display:flex;align-items:center;justify-content:center}.c{background:#fff;border-radius:20px;padding:40px 36px;width:min(380px,92vw);box-shadow:0 24px 60px rgba(0,0,0,.4)}.logo{font-size:28px;font-weight:800;color:#b31e59;margin-bottom:4px}.tag{font-size:13px;color:#9ca3af;margin-bottom:32px}.f{margin-bottom:16px}label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px}input{width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:15px;outline:none;font-family:inherit}input:focus{border-color:#b31e59}.err{color:#b31e59;font-size:13px;margin-top:8px;display:none}.err.show{display:block}button{width:100%;margin-top:8px;padding:13px;background:#b31e59;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}</style></head><body><div class="c"><div class="logo">spot.</div><div class="tag">content studio</div><form method="POST" action="/login"><div class="f"><label>Användarnamn</label><input type="text" name="username" autofocus/></div><div class="f"><label>Lösenord</label><input type="password" name="password"/></div><div class="err" id="err">Fel.</div><button type="submit">Logga in</button><div style="text-align:center;margin-top:14px"><a href="/forgot" style="font-size:12px;color:#9ca3af;text-decoration:none">Glömt lösenord?</a></div><div class="ok" id="ok" style="display:none;color:#16a34a;font-size:13px;margin-top:8px;text-align:center">Lösenordet är återställt. Logga in med det nya lösenordet.</div></form></div><script>var q=new URLSearchParams(location.search);if(q.get("err"))document.getElementById("err").classList.add("show");if(q.get("reset"))document.getElementById("ok").style.display="block"<\/script></body></html>'
 
