@@ -416,7 +416,7 @@ textarea.field-input{resize:none;line-height:1.5}
       <div class="tb-avatar" id="avatarBtn" onclick="togglePubDropdown()"><span id="avatarInitials">A</span>
         <div class="pub-badge" id="pubBadge"></div>
       </div>
-      <div class="pub-dropdown" id="pubDropdown"><div style="padding:12px 14px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;gap:10px"><div class="tb-avatar" style="width:36px;height:36px;flex-shrink:0"><span id="avatarInitials2">A</span></div><div style="min-width:0"><div id="userFullName" style="font-size:14px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Laddar…</div><div style="font-size:11px;color:#9ca3af">Inloggad</div></div></div><div class="pd-header">Mina kanaler (snabbdelning)</div><div id="myChannels"><div class="pd-empty">Inga kanaler tillagda</div></div><div style="padding:8px 14px;display:flex;gap:6px;border-bottom:1px solid #f0f0f0"><select id="mcPlatform" style="font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px"><option value="instagram">📷 IG</option><option value="linkedin">💼 LI</option><option value="facebook">👥 FB</option><option value="tiktok">🎵 TT</option></select><input id="mcHandle" placeholder="@namn eller länk" style="flex:1;min-width:0;font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px 8px"><button onclick="addMyChannel()" style="font-size:14px;font-weight:700;padding:5px 12px;border-radius:6px;border:none;background:var(--m);color:#fff;cursor:pointer">+</button></div>
+      <div class="pub-dropdown" id="pubDropdown"><div style="padding:12px 14px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;gap:10px"><div class="tb-avatar" style="width:36px;height:36px;flex-shrink:0"><span id="avatarInitials2">A</span></div><div style="min-width:0"><div id="userFullName" style="font-size:14px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Laddar…</div><div style="font-size:11px;color:#9ca3af">Inloggad</div></div></div><div class="pd-header">Mina kanaler (snabbdelning)</div><div id="myChannels"><div class="pd-empty">Inga kanaler tillagda</div></div><div style="padding:8px 14px;display:flex;gap:6px;border-bottom:1px solid #f0f0f0"><select id="mcPlatform" style="font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px"><option value="instagram">📷 IG</option><option value="linkedin">💼 LI</option><option value="facebook">👥 FB</option><option value="tiktok">🎵 TT</option></select><input id="mcHandle" placeholder="@namn eller länk" style="flex:1;min-width:0;font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px 8px"><button onclick="addMyChannel()" style="font-size:14px;font-weight:700;padding:5px 12px;border-radius:6px;border:none;background:var(--m);color:#fff;cursor:pointer">+</button></div><div id="liStatusBox" style="padding:10px 14px;border-top:1px solid #f0f0f0;border-bottom:1px solid #f0f0f0;font-size:12px;color:#6b7280">Kollar LinkedIn-status…</div>
         <div class="pd-header">Publicerade inlägg</div>
         <div id="pubList"><div class="pd-empty">Inga publicerade inlägg ännu</div></div>
         <div style="border-top:1px solid #f0f0f0;padding:10px 14px"><button onclick="openChangePwModal()" style="width:100%;text-align:left;background:none;border:none;font-size:13px;color:#374151;cursor:pointer;padding:4px 0">🔒 Byt lösenord</button></div>
@@ -919,7 +919,7 @@ const S = {
 (function(){ try{ var _as=JSON.parse(localStorage.getItem('spotAppState')||'null'); if(_as){ if(Array.isArray(_as.reviewQueue))S.reviewQueue=_as.reviewQueue; if(Array.isArray(_as.publishedPosts))S.publishedPosts=_as.publishedPosts; if(_as.archiveOverride)S.archiveOverride=_as.archiveOverride; } }catch(e){} })();
 function _saveAppState(){ try{ localStorage.setItem('spotAppState', JSON.stringify({reviewQueue:S.reviewQueue, publishedPosts:S.publishedPosts, archiveOverride:S.archiveOverride})); }catch(e){} }
 var CURRENT_ROLE = 'admin';
-function _loadUserInfo(){ fetch('/api/me').then(function(r){ return r.json(); }).then(function(u){ var el=document.getElementById('avatarInitials'); if(el && u.initials) el.textContent=u.initials; var el2=document.getElementById('avatarInitials2'); if(el2 && u.initials) el2.textContent=u.initials; var btn=document.getElementById('avatarBtn'); if(btn && u.firstName) btn.title=u.firstName+' '+u.lastName; var nameEl=document.getElementById('userFullName'); if(nameEl) nameEl.textContent=(u.firstName||'')+' '+(u.lastName||''); CURRENT_ROLE = u.role || 'admin'; applyRolePermissions(); if (typeof _loadMyChannels === 'function') _loadMyChannels(); }).catch(function(){}); }
+function _loadUserInfo(){ fetch('/api/me').then(function(r){ return r.json(); }).then(function(u){ var el=document.getElementById('avatarInitials'); if(el && u.initials) el.textContent=u.initials; var el2=document.getElementById('avatarInitials2'); if(el2 && u.initials) el2.textContent=u.initials; var btn=document.getElementById('avatarBtn'); if(btn && u.firstName) btn.title=u.firstName+' '+u.lastName; var nameEl=document.getElementById('userFullName'); if(nameEl) nameEl.textContent=(u.firstName||'')+' '+(u.lastName||''); CURRENT_ROLE = u.role || 'admin'; applyRolePermissions(); if (typeof _loadMyChannels === 'function') _loadMyChannels(); if (typeof _loadLinkedInStatus === 'function') _loadLinkedInStatus(); }).catch(function(){}); }
 function applyRolePermissions(){
   var isAdmin = CURRENT_ROLE === 'admin';
   var isGranskare = CURRENT_ROLE === 'granskare';
@@ -1872,6 +1872,22 @@ function rejectPost(id){
 }
 function _arFor(ch){return ({instagram:"4/5",tiktok:"9/16",facebook:"1/1",linkedin:"1/1"})[ch]||"4/5";}
 (function(){function _syncAR(){try{var ch=window._activeProposalTab||(typeof S!=="undefined"&&S.previewChannel)||(typeof S!=="undefined"&&S.manualChannel)||"instagram";document.documentElement.style.setProperty("--post-ar",_arFor(ch));}catch(e){}}setInterval(_syncAR,400);document.addEventListener("DOMContentLoaded",_syncAR);})();
+var _liConnected = false;
+function _loadLinkedInStatus(){
+  fetch('/api/linkedin/status').then(function(r){return r.json();}).then(function(data){
+    _liConnected = !!data.connected;
+    var box = document.getElementById('liStatusBox');
+    if (!box) return;
+    if (data.connected) {
+      box.innerHTML = '💼 LinkedIn anslutet (' + (data.name||'') + ') <button onclick="disconnectLinkedIn()" style="margin-left:6px;font-size:11px;color:#b31e59;background:none;border:none;cursor:pointer;text-decoration:underline">Koppla bort</button>';
+    } else {
+      box.innerHTML = '<a href="/auth/linkedin" style="color:var(--m);font-weight:600;text-decoration:none">🔗 Anslut LinkedIn för automatisk delning</a>';
+    }
+  }).catch(function(){});
+}
+function disconnectLinkedIn(){
+  fetch('/api/linkedin/disconnect', {method:'POST'}).then(function(){ _loadLinkedInStatus(); if(typeof showToast==='function') showToast('LinkedIn frånkopplat'); });
+}
 var _myChCache = [];
 function _getMyCh(){ return _myChCache; }
 function _loadMyChannels(){ fetch('/api/channels').then(function(r){ return r.json(); }).then(function(data){ _myChCache = data.channels || []; if (typeof renderMyChannels === 'function') renderMyChannels(); }).catch(function(){}); }
