@@ -3270,6 +3270,20 @@ function quickShareAdvocacy(idx, posts) {
   const chans = _getMyCh();
   const match = chans.find(c => c.platform === (p.channel||'linkedin'));
   if (!match) { openShareModal(idx, posts); return; }
+  const tags0 = (p.hashtags||[]).map(t=>'#'+t.replace(/^#/,'')).join(' ');
+  const fullText0 = `${p.title||''}\n\n${p.content||''}\n\n${tags0}${p.cta?'\n\n'+p.cta:''}`;
+  if (match.platform === 'linkedin' && _liConnected) {
+    const imgUrlLi = p.imageUrl || p.aiImageUrl || null;
+    if (typeof showToast==='function') showToast('📤 Publicerar på LinkedIn…');
+    fetch('/api/linkedin/publish', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: fullText0, imageDataUrl: imgUrlLi }) })
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, data:d}; }); })
+      .then(function(res){
+        if (res.ok) { if (typeof showToast==='function') showToast('✅ Publicerat på LinkedIn!'); }
+        else { if (typeof showToast==='function') showToast('⚠️ ' + (res.data.error||'Kunde inte publicera')); }
+      })
+      .catch(function(){ if (typeof showToast==='function') showToast('⚠️ Kunde inte publicera'); });
+    return;
+  }
   const tags = (p.hashtags||[]).map(t=>'#'+t.replace(/^#/,'')).join(' ');
   const fullText = `${p.title||''}\n\n${p.content||''}\n\n${tags}${p.cta?'\n\n'+p.cta:''}`;
   const encodedText = encodeURIComponent(fullText.slice(0,500));
