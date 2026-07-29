@@ -6,6 +6,7 @@ const crypto = require('crypto')
 let nodemailer = null
 try { nodemailer = require('nodemailer') } catch (e) {}
 const app = express()
+app.set('trust proxy', 1)
 const PORT = process.env.PORT || 3000
 const UNAME = process.env.APP_USERNAME || 'Spot'
 const UPASS = process.env.APP_PASSWORD || '1234'
