@@ -2290,8 +2290,9 @@ function renderReview() {
   grid.innerHTML = S.reviewQueue.map((post, idx) => {
     const c = checkCompliance(post);
     let badges;
-    if (c.isValid && !c.warnings.length) badges = '<span class="rule-ok">✓ OK</span>';
-    else badges = [...c.issues.map(i => `<span class="rule-err">✗ ${i}</span>`), ...c.warnings.map(w => `<span class="rule-warn">⚠ ${w}</span>`)].join('');
+    const quickActions = `<button class="rc-quick-edit" onclick="event.stopPropagation();openEditorModal(S.reviewQueue.find(p=>p.id==='${post.id}'))" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;border:1px solid #e5e7eb;background:#fff;color:#374151;cursor:pointer">✏️ Redigera</button><button class="rc-quick-reject" onclick="event.stopPropagation();rejectPost('${post.id}')" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;border:1px solid #fecaca;background:#fff;color:#b31e59;cursor:pointer;margin-left:6px">⨯ Neka</button>`;
+    if (c.isValid && !c.warnings.length) badges = quickActions;
+    else badges = quickActions + '<div style="margin-top:6px">' + [...c.issues.map(i => `<span class="rule-err">✗ ${i}</span>`), ...c.warnings.map(w => `<span class="rule-warn">⚠ ${w}</span>`)].join('') + '</div>';
     return `<div class="review-card ${S.selectedReviewId === post.id ? 'selected' : ''}" onclick="selectReview('${post.id}')">
       <div class="rc-thumb" style="aspect-ratio:${_arFor(post.channel)};position:relative;overflow:hidden;" onclick="event.stopPropagation();openLightbox(${idx})">
         ${getPostImageHTML(post)}
