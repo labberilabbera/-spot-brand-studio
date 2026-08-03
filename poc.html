@@ -1693,7 +1693,7 @@ function renderPreview() {
   const mockPost = { channel: ch, layout: 'gradient', ...p };
   body.innerHTML = `
     <div style="width:220px">
-      <div style="border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15);aspect-ratio:${_arFor(mockPost.channel)}">
+      <div onclick="openCreateEditor()" style="cursor:pointer;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15);aspect-ratio:${_arFor(mockPost.channel)}">
         ${getPostImageHTML(mockPost)}
       </div>
       <div style="font-size:11px;color:#9ca3af;text-align:center;margin-top:8px;font-family:Helvetica,Arial,sans-serif">${CH_LABEL[ch]} · spot.</div>
@@ -2189,7 +2189,7 @@ function updateManualPreview() {
   if (panelTitle) panelTitle.textContent = 'Förhandsvisning';
   body.innerHTML = `
     <div style="width:100%">
-      <div style="border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15);aspect-ratio:${_arFor(mockPost.channel)}">
+      <div onclick="openCreateEditor()" style="cursor:pointer;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15);aspect-ratio:${_arFor(mockPost.channel)}">
         ${getPostImageHTML(mockPost)}
       </div>
       <div style="font-size:11px;color:#9ca3af;text-align:center;margin-top:8px">${CH_LABEL[S.manualChannel]}</div>
