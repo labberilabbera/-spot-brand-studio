@@ -2411,6 +2411,7 @@ function openEditorModal(post) {
   post.blocks = post.blocks.filter(function(b){ return b !== 'cta'; });
   S._editPost = post; // working copy reference
   S._editImgUndoStack = [];
+  S._editBlockUndoStack = [];
 
   // Build left panel (form fields + block order)
   const left = document.getElementById('emLeft');
@@ -2451,12 +2452,16 @@ function openEditorModal(post) {
         ${post.blocks.map(bk => {
           const meta = BLOCK_META[bk];
           const draggable = bk !== 'brand' ? 'draggable="true"' : '';
-          return `<div class="dnd-block" data-block="${bk}" ${draggable}>
+          const delBtn = bk !== 'brand' ? `<span class="bk-del" onclick="emRemoveBlock('${bk}')" style="margin-left:auto;color:#b31e59;cursor:pointer;font-size:14px;padding:0 4px">✕</span>` : '';
+          return `<div class="dnd-block" data-block="${bk}" ${draggable} style="display:flex;align-items:center">
             <span class="drag-dots">${bk !== 'brand' ? '⠿' : '⠀'}</span>
             <span class="bk-icon">${meta.icon}</span>
             <span class="bk-label">${meta.label}</span>
+            ${delBtn}
           </div>`;
         }).join('')}
+      </div>
+      <button id="emBlockUndoBtn" onclick="emUndoRemoveBlock()" style="display:none;margin-top:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:1.5px solid #e5e7eb;background:#fff;color:#374151;cursor:pointer">↶ Ångra borttagning</button>
       </div>
     </div>`;
 
@@ -2475,6 +2480,8 @@ function emRenderPreview() {
   if (!post) return;
   const card = document.getElementById('emPreviewCard');
   if (!card) return;
+  card.style.aspectRatio = (typeof _arFor==='function') ? _arFor(post.channel) : '4/5';
+  card.style.position = 'relative';
   // Render the post card with contenteditable regions
   card.innerHTML = getPostImageHTML(post);
   // Make title, content, cta directly editable
