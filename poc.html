@@ -2062,11 +2062,12 @@ function renderProposalCards(ch) {
     proposals.slice(0,3).map((p, i) => {
       const cardLayouts = ['studio','case','louisiana'];
       const mockPost = { channel: ch, layout: cardLayouts[i] || 'gradient', title: p.title||'', content: p.content||'', hashtags: (p.hashtags||[]).map(t=>t.replace(/^#/,'')), cta: p.cta||'', imageUrl: activeImageUrl(), imageStyle: S.imageStyle };
-      return `<div class="ai-prop-card ${i===selectedIdx?'selected':''}" onclick="selectProposalCard('${ch}',${i})">
+      const dim = i!==selectedIdx;
+      return `<div class="ai-prop-card ${i===selectedIdx?'selected':''}" onclick="openProposalZoom('${ch}',${i})" style="${dim ? 'opacity:.55;filter:grayscale(.3)' : ''};transition:opacity .15s,filter .15s">
         <div class="ai-prop-thumb" style="position:relative;aspect-ratio:${_arFor(ch)}">
           ${getPostImageHTML(mockPost)}
           ${S._aiImageLoading ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;z-index:5"><div style="width:22px;height:22px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite"></div><div style="font-size:9px;color:#fff;font-weight:600">Skapar bild…</div></div>` : ''}
-          <button class="prop-zoom-btn" title="Förstora" onclick="event.stopPropagation();openProposalZoom('${ch}',${i})">⤢</button>
+          <button class="prop-zoom-btn" title="Välj som denna" onclick="event.stopPropagation();selectProposalCard('${ch}',${i})" style="${i===selectedIdx?'opacity:1;background:#b31e59':''}">${i===selectedIdx?'✓':'○'}</button>
         </div>
         <div class="ai-prop-meta">
           <div class="ai-prop-num">Förslag ${i+1}${i===selectedIdx?' · ✓ Vald':''}</div>
