@@ -2461,7 +2461,7 @@ function openEditorModal(post) {
           </div>`;
         }).join('')}
       </div>
-      <button id="emBlockUndoBtn" onclick="emUndoRemoveBlock()" style="display:none;margin-top:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:1.5px solid #e5e7eb;background:#fff;color:#374151;cursor:pointer">↶ Ångra borttagning</button>
+      <button id="emBlockUndoBtn" onclick="emUndoRemoveBlock()" style="display:${(S._editBlockUndoStack&&S._editBlockUndoStack.length)?'inline-flex':'none'};margin-top:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:1.5px solid #e5e7eb;background:#fff;color:#374151;cursor:pointer">↶ Ångra borttagning</button>
     </div>`;
 
   // Build right panel (live editable preview)
