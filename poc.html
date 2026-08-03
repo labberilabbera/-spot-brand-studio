@@ -578,6 +578,7 @@ textarea.field-input{resize:none;line-height:1.5}
               <button class="tag-add-btn" onclick="addManualTag()">+</button>
             </div>
           </div>
+          <button type="button" onclick="openCreateEditor()" style="width:100%;margin-bottom:12px;padding:10px 14px;background:#fff;border:1.5px solid var(--m);color:var(--m);border-radius:9px;font-size:13px;font-weight:600;cursor:pointer">✏️ Redigera i editor (block, bild, m.m.)</button>
           <div style="display:none">
             <div class="field-label">Call-to-Action</div>
             <input class="field-input" id="m-cta" placeholder="t.ex. Besök vår webbplats!" oninput="updateManualPreview()">
@@ -1169,10 +1170,11 @@ function _imgOrGray(post) {
 
 function getPostImageHTML(post, size='card') {
   const layout = post.layout || 'gradient';
-  const t    = post.title   || '';
-  const c    = post.content || '';
+  const _blocks = post.blocks || ['brand','title','content','hashtags','cta'];
+  const t    = _blocks.includes('title')   ? (post.title   || '') : '';
+  const c    = _blocks.includes('content') ? (post.content || '') : '';
   const cta  = '';
-  const tags = (post.hashtags || []).slice(0,3).map(h=>`#${h.replace(/^#/,'')}`).join(' ');
+  const tags = _blocks.includes('hashtags') ? (post.hashtags || []).slice(0,3).map(h=>`#${h.replace(/^#/,'')}`).join(' ') : '';
   const grad = CH_GRAD[post.channel] || CH_GRAD.instagram;
   const hasImg = !!post.imageUrl;
   const dateStr = post.date || new Date().toISOString().slice(0,10);
