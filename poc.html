@@ -930,7 +930,7 @@ const S = {
 (function(){ try{ var _as=JSON.parse(localStorage.getItem('spotAppState')||'null'); if(_as){ if(Array.isArray(_as.reviewQueue))S.reviewQueue=_as.reviewQueue; if(Array.isArray(_as.publishedPosts))S.publishedPosts=_as.publishedPosts; if(_as.archiveOverride)S.archiveOverride=_as.archiveOverride; } }catch(e){} })();
 function _saveAppState(){ try{ localStorage.setItem('spotAppState', JSON.stringify({reviewQueue:S.reviewQueue, publishedPosts:S.publishedPosts, archiveOverride:S.archiveOverride})); }catch(e){} }
 var CURRENT_ROLE = 'admin';
-function _loadUserInfo(){ fetch('/api/me').then(function(r){ return r.json(); }).then(function(u){ var el=document.getElementById('avatarInitials'); if(el && u.initials) el.textContent=u.initials; var el2=document.getElementById('avatarInitials2'); if(el2 && u.initials) el2.textContent=u.initials; var btn=document.getElementById('avatarBtn'); if(btn && u.firstName) btn.title=u.firstName+' '+u.lastName; var nameEl=document.getElementById('userFullName'); if(nameEl) nameEl.textContent=(u.firstName||'')+' '+(u.lastName||''); CURRENT_ROLE = u.role || 'admin'; applyRolePermissions(); if (typeof _loadMyChannels === 'function') _loadMyChannels(); if (typeof _loadLinkedInStatus === 'function') _loadLinkedInStatus(); if (typeof _loadImgLibrary === 'function') _loadImgLibrary(); }).catch(function(){}); }
+function _loadUserInfo(){ fetch('/api/me').then(function(r){ return r.json(); }).then(function(u){ var el=document.getElementById('avatarInitials'); if(el && u.initials) el.textContent=u.initials; var el2=document.getElementById('avatarInitials2'); if(el2 && u.initials) el2.textContent=u.initials; var btn=document.getElementById('avatarBtn'); if(btn && u.firstName) btn.title=u.firstName+' '+u.lastName; var nameEl=document.getElementById('userFullName'); if(nameEl) nameEl.textContent=(u.firstName||'')+' '+(u.lastName||''); CURRENT_ROLE = u.role || 'admin'; applyRolePermissions(); if (typeof _loadMyChannels === 'function') _loadMyChannels(); if (typeof _loadLinkedInStatus === 'function') _loadLinkedInStatus(); if (typeof _loadImgLibrary === 'function') _loadImgLibrary(); if (typeof _loadDrafts === 'function') _loadDrafts(); }).catch(function(){}); }
 function applyRolePermissions(){
   var isAdmin = CURRENT_ROLE === 'admin';
   var isGranskare = CURRENT_ROLE === 'granskare';
@@ -1884,8 +1884,9 @@ function getBrandProfile() {
     forbidden: FORBIDDEN,
   };
 }
-function _getDrafts(){ try{return JSON.parse(localStorage.getItem("spotDrafts")||"[]");}catch(e){return [];} }
-function _setDrafts(a){ try{localStorage.setItem("spotDrafts",JSON.stringify(a));}catch(e){} }
+var _draftsCache = [];
+function _getDrafts(){ return _draftsCache; }
+function _loadDrafts(){ fetch('/api/drafts').then(function(r){return r.json();}).then(function(data){ _draftsCache = data.drafts || []; var el=document.getElementById("draftsPanel"); if(el && el.style.display==="block") renderDraftsPanel(); }).catch(function(){}); }
 function resetCreateForm(){
   var t=document.getElementById("m-title"); if(t)t.value="";
   var c=document.getElementById("m-content"); if(c)c.value="";
@@ -1953,13 +1954,26 @@ function saveDraft(){
   var title=t?t.value:"", content=c?c.value:"";
   var channels=[].slice.call(document.querySelectorAll("#manualChGrid .ch-pill.active")).map(function(p){return p.dataset.ch;});
   if(!(title||"").trim()&&!(content||"").trim()){ showToast("Inget att spara – fyll i titel eller innehåll."); return; }
-  var drafts=_getDrafts();
-  drafts.unshift({ id:"d"+Date.now(), ts:Date.now(), title:title, content:content, channels:channels, proposals:(window._allChannelProposals||null), selected:(window._selectedProposalPerChannel||null), aiImageUrl:(S._aiImageUrl||null), imgPos:(S._imgPos||null), uploaded:(S._uploadedImageUrl||null) });
-  if(drafts.length>50)drafts=drafts.slice(0,50);
-  _setDrafts(drafts); showToast("💾 Utkast sparat!"); resetCreateForm();
-  var el=document.getElementById("draftsPanel"); if(el&&el.style.display!=="none")renderDraftsPanel();
+  var draft = { title:title, content:content, channels:channels, proposals:(window._allChannelProposals||null), selected:(window._selectedProposalPerChannel||null), aiImageUrl:(S._aiImageUrl||null), imgPos:(S._imgPos||null), uploaded:(S._uploadedImageUrl||null) };
+  fetch("/api/drafts", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(draft) })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (res.ok) {
+        draft.id = res.id; draft.ts = res.ts;
+        _draftsCache.unshift(draft);
+        showToast("💾 Utkast sparat!"); resetCreateForm();
+        var el=document.getElementById("draftsPanel"); if(el&&el.style.display!=="none")renderDraftsPanel();
+      } else {
+        showToast("⚠️ Kunde inte spara utkastet");
+      }
+    })
+    .catch(function(){ showToast("⚠️ Kunde inte spara utkastet"); });
 }
-function deleteDraft(id){ _setDrafts(_getDrafts().filter(function(x){return x.id!==id;})); renderDraftsPanel(); }
+function deleteDraft(id){
+  fetch("/api/drafts/delete", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({id:id}) })
+    .then(function(){ _draftsCache = _draftsCache.filter(function(x){return x.id!==id;}); renderDraftsPanel(); })
+    .catch(function(){ _draftsCache = _draftsCache.filter(function(x){return x.id!==id;}); renderDraftsPanel(); });
+}
 function openDraft(id){
   var dft=_getDrafts().filter(function(x){return x.id===id;})[0]; if(!dft)return;
   if(typeof navigate==="function")navigate("create");
