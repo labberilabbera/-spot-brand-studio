@@ -2408,6 +2408,7 @@ function renderCanvasEditor(post) {
 function openEditorModal(post) {
   if (!post.blocks) post.blocks = [...DEFAULT_BLOCK_ORDER];
   S._editPost = post; // working copy reference
+  S._editImgUndoStack = [];
 
   // Build left panel (form fields + block order)
   const left = document.getElementById('emLeft');
@@ -2429,6 +2430,14 @@ function openEditorModal(post) {
           onkeydown="if(event.key==='Enter'){emAddTag();event.preventDefault()}">
         <button onclick="emAddTag()" style="padding:8px 14px;background:#f3f4f6;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid #e5e7eb">+</button>
       </div>
+    </div>
+    <div>
+      <div class="em-field-label">🎨 Bild</div>
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <input id="em-img-reprompt" class="em-input" style="flex:1" placeholder="Beskriv en ändring av bilden...">
+        <button onclick="emRepromptImage()" style="padding:8px 12px;background:var(--m);color:#fff;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;border:none;white-space:nowrap">Ny bild</button>
+      </div>
+      <button id="emImgUndoBtn" onclick="emUndoImage()" style="display:none;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:1.5px solid #e5e7eb;background:#fff;color:#374151;cursor:pointer">↶ Ångra bild</button>
     </div>
     <div style="display:none">
       <div class="em-field-label">Call-to-Action</div>
@@ -2485,6 +2494,46 @@ function emSyncFromForm() {
   if (c)  post.content = c.value;
   if (ca) post.cta     = ca.value;
   emRenderPreview();
+}
+async function emRepromptImage(){
+  const post = S._editPost;
+  if (!post) return;
+  const inp = document.getElementById('em-img-reprompt');
+  const extra = inp ? inp.value.trim() : '';
+  const base = post.title || post.content || '';
+  if (!base && !extra) { if (typeof showToast==='function') showToast('Skriv en beskrivning av ändringen.'); return; }
+  const brief = extra ? (base ? (base + '. Ändring: ' + extra) : extra) : base;
+  const btn = event && event.target;
+  const oldText = btn ? btn.textContent : null;
+  if (btn) { btn.textContent = 'Skapar...'; btn.disabled = true; }
+  try {
+    const brand = (typeof getBrandProfile==='function') ? getBrandProfile() : undefined;
+    const res = await fetch('/api/generate-image', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ brief, style: S.imageStyle, brand }) });
+    const data = await res.json();
+    if (!res.ok || !data.imageUrl) throw new Error(data.error || 'Bild misslyckades');
+    S._editImgUndoStack = S._editImgUndoStack || [];
+    S._editImgUndoStack.push(post.imageUrl || post.aiImageUrl || null);
+    post.imageUrl = data.imageUrl;
+    post.aiImageUrl = data.imageUrl;
+    const ub = document.getElementById('emImgUndoBtn'); if (ub) ub.style.display = 'inline-flex';
+    if (inp) inp.value = '';
+    emRenderPreview();
+    if (typeof showToast==='function') showToast('🎨 Ny bild skapad!');
+  } catch(e) {
+    if (typeof showToast==='function') showToast('⚠️ ' + e.message);
+  } finally {
+    if (btn) { btn.textContent = oldText || 'Ny bild'; btn.disabled = false; }
+  }
+}
+function emUndoImage(){
+  const post = S._editPost;
+  if (!post || !S._editImgUndoStack || !S._editImgUndoStack.length) return;
+  const prev = S._editImgUndoStack.pop();
+  post.imageUrl = prev;
+  post.aiImageUrl = prev;
+  if (!S._editImgUndoStack.length) { const ub = document.getElementById('emImgUndoBtn'); if (ub) ub.style.display = 'none'; }
+  emRenderPreview();
+  if (typeof showToast==='function') showToast('↶ Bild återställd');
 }
 
 function emSyncToForm(field, val) {
