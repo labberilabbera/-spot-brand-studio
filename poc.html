@@ -553,6 +553,7 @@ textarea.field-input{resize:none;line-height:1.5}
               <div style="font-size:24px;margin-bottom:4px">🖼</div>
               <div style="font-size:13px;font-weight:500;color:#374151">Klicka eller dra en bild hit</div>
               <div style="font-size:11px;color:#9ca3af">JPG, PNG, WEBP · max 5 MB</div>
+              <div style="margin-top:8px"><button onclick="event.stopPropagation();openLibraryPicker()" style="font-size:12px;color:var(--m);font-weight:600;border:none;background:none;cursor:pointer;text-decoration:underline">📚 eller välj från bildbiblioteket</button></div>
             </div>
           </div>
           <!-- Drag-to-reposition frame (shown after upload) -->
@@ -811,6 +812,15 @@ textarea.field-input{resize:none;line-height:1.5}
   </div>
 </div>
 
+<div id="libPickerModal" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:400;display:none;align-items:center;justify-content:center" onclick="if(event.target===this)closeLibraryPicker()">
+  <div style="background:#fff;border-radius:20px;width:min(480px,94vw);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden">
+    <div style="padding:16px 20px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:15px;font-weight:700;color:#111">📚 Välj bild från biblioteket</div>
+      <button onclick="closeLibraryPicker()" style="font-size:18px;color:#9ca3af;line-height:1;padding:2px 6px;background:none;border:none;cursor:pointer">×</button>
+    </div>
+    <div id="libPickerGrid" style="padding:16px 20px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px"></div>
+  </div>
+</div>
 <div id="shareModal" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300;display:none;align-items:center;justify-content:center" onclick="if(event.target===this)closeShareModal()">
   <div style="background:#fff;border-radius:20px;width:min(480px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden">
     <div style="padding:18px 20px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between">
@@ -934,6 +944,39 @@ function applyRolePermissions(){
 _loadUserInfo();
 function _getImgLib(){ try{ return JSON.parse(localStorage.getItem('spotImgLibrary')||'[]'); }catch(e){ return []; } }
 function _setImgLib(a){ try{ localStorage.setItem('spotImgLibrary', JSON.stringify(a)); return true; }catch(e){ return false; } }
+function openLibraryPicker(){
+  var modal = document.getElementById('libPickerModal');
+  var grid = document.getElementById('libPickerGrid');
+  if (!modal || !grid) return;
+  var lib = _getImgLib();
+  if (!lib.length) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;font-size:13px;color:#9ca3af">Inga bilder i biblioteket ännu.<br>Ladda upp bilder under Varumärke → Bildbibliotek.</div>'; }
+  else {
+    grid.innerHTML = lib.map(function(img, i){
+      return '<div onclick="selectFromLibrary(' + i + ')" style="cursor:pointer;aspect-ratio:1;border-radius:8px;overflow:hidden;border:2px solid #e5e7eb;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--m)\'" onmouseout="this.style.borderColor=\'#e5e7eb\'"><img src="' + img.url + '" style="width:100%;height:100%;object-fit:cover"/></div>';
+    }).join('');
+  }
+  modal.style.display = 'flex';
+}
+function closeLibraryPicker(){ var m=document.getElementById('libPickerModal'); if(m)m.style.display='none'; }
+function selectFromLibrary(i){
+  var lib = _getImgLib();
+  var img = lib[i];
+  if (!img) return;
+  S._uploadedImageUrl = img.url;
+  S._imgPos = { x: 0, y: 0, zoom: 1 };
+  var preview = document.getElementById('imgPreview');
+  if (preview) { preview.src = img.url; preview.style.objectPosition = '50% 50%'; }
+  var ua = document.getElementById('imgUploadArea'); if (ua) ua.style.display = 'none';
+  var rf = document.getElementById('imgRepoFrame'); if (rf) rf.style.display = 'block';
+  var ec = document.getElementById('imgEditControls'); if (ec) ec.style.display = 'flex';
+  var z = document.getElementById('imgZoom'); if (z) z.value = 1;
+  if (typeof applyImgPreviewTransform === 'function') applyImgPreviewTransform();
+  var rb = document.getElementById('imgRemoveBtn'); if (rb) rb.style.display = 'inline-flex';
+  var sw = document.getElementById('imgSwapBtn'); if (sw) sw.style.display = 'inline-flex';
+  closeLibraryPicker();
+  if (typeof updateManualPreview === 'function') updateManualPreview();
+  if (typeof showToast === 'function') showToast('📚 Bild vald från biblioteket');
+}
 function renderImgLibrary(){
   var grid = document.getElementById('imgLibGrid');
   if (!grid) return;
