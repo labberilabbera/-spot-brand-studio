@@ -416,7 +416,7 @@ textarea.field-input{resize:none;line-height:1.5}
       <div class="tb-avatar" id="avatarBtn" onclick="togglePubDropdown()"><span id="avatarInitials">A</span>
         <div class="pub-badge" id="pubBadge"></div>
       </div>
-      <div class="pub-dropdown" id="pubDropdown"><div style="padding:12px 14px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;gap:10px"><div class="tb-avatar" style="width:36px;height:36px;flex-shrink:0"><span id="avatarInitials2">A</span></div><div style="min-width:0"><div id="userFullName" style="font-size:14px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Laddar…</div><div style="font-size:11px;color:#9ca3af">Inloggad</div></div></div><div class="pd-header">Mina kanaler (snabbdelning)</div><div id="myChannels"><div class="pd-empty">Inga kanaler tillagda</div></div><div style="padding:8px 14px;display:flex;gap:6px;border-bottom:1px solid #f0f0f0"><select id="mcPlatform" style="font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px"><option value="instagram">📷 IG</option><option value="linkedin">💼 LI</option><option value="facebook">👥 FB</option><option value="tiktok">🎵 TT</option></select><input id="mcHandle" placeholder="@namn eller länk" style="flex:1;min-width:0;font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px 8px"><button onclick="addMyChannel()" style="font-size:14px;font-weight:700;padding:5px 12px;border-radius:6px;border:none;background:var(--m);color:#fff;cursor:pointer">+</button></div><div id="liStatusBox" style="padding:10px 14px;border-top:1px solid #f0f0f0;border-bottom:1px solid #f0f0f0;font-size:12px;color:#6b7280">Kollar LinkedIn-status…</div>
+      <div class="pub-dropdown" id="pubDropdown"><div style="padding:12px 14px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;gap:10px"><div class="tb-avatar" style="width:36px;height:36px;flex-shrink:0"><span id="avatarInitials2">A</span></div><div style="min-width:0"><div id="userFullName" style="font-size:14px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Laddar…</div><div style="font-size:11px;color:#9ca3af">Inloggad</div></div></div><div class="pd-header">Mina kanaler (snabbdelning)</div><div id="myChannels"><div class="pd-empty">Inga kanaler tillagda</div></div><div style="padding:8px 14px;display:flex;gap:6px;border-bottom:1px solid #f0f0f0"><select id="mcPlatform" style="font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px"><option value="instagram">📷 IG</option><option value="linkedin">💼 LI</option><option value="facebook">👥 FB</option><option value="tiktok" style="display:none">🎵 TT</option></select><input id="mcHandle" placeholder="@namn eller länk" style="flex:1;min-width:0;font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:5px 8px"><button onclick="addMyChannel()" style="font-size:14px;font-weight:700;padding:5px 12px;border-radius:6px;border:none;background:var(--m);color:#fff;cursor:pointer">+</button></div><div id="liStatusBox" style="padding:10px 14px;border-top:1px solid #f0f0f0;border-bottom:1px solid #f0f0f0;font-size:12px;color:#6b7280">Kollar LinkedIn-status…</div>
         <div class="pd-header">Publicerade inlägg</div>
         <div id="pubList"><div class="pd-empty">Inga publicerade inlägg ännu</div></div>
         <div style="border-top:1px solid #f0f0f0;padding:10px 14px"><button onclick="openChangePwModal()" style="width:100%;text-align:left;background:none;border:none;font-size:13px;color:#374151;cursor:pointer;padding:4px 0">🔒 Byt lösenord</button></div>
@@ -493,7 +493,7 @@ textarea.field-input{resize:none;line-height:1.5}
               <div class="ch-bar-wrap"><div class="ch-bar-label"><span>Instagram</span><span id="cb-ig">0</span></div><div class="ch-bar-track"><div class="ch-bar-fill" id="cf-ig" style="width:0%"></div></div></div>
               <div class="ch-bar-wrap"><div class="ch-bar-label"><span>LinkedIn</span><span id="cb-li">0</span></div><div class="ch-bar-track"><div class="ch-bar-fill" id="cf-li" style="width:0%"></div></div></div>
               <div class="ch-bar-wrap"><div class="ch-bar-label"><span>Facebook</span><span id="cb-fb">0</span></div><div class="ch-bar-track"><div class="ch-bar-fill" id="cf-fb" style="width:0%"></div></div></div>
-              <div class="ch-bar-wrap"><div class="ch-bar-label"><span>TikTok</span><span id="cb-tt">0</span></div><div class="ch-bar-track"><div class="ch-bar-fill" id="cf-tt" style="width:0%"></div></div></div>
+              <div class="ch-bar-wrap" style="display:none"><div class="ch-bar-label"><span>TikTok</span><span id="cb-tt">0</span></div><div class="ch-bar-track"><div class="ch-bar-fill" id="cf-tt" style="width:0%"></div></div></div>
             </div>
           </div>
         </div>
@@ -535,7 +535,7 @@ textarea.field-input{resize:none;line-height:1.5}
             <div class="ch-pill active" onclick="pickManualCh(this,'linkedin')" data-ch="linkedin"><span>💼</span> LinkedIn</div>
             <div class="ch-pill" onclick="pickManualCh(this,'facebook')" data-ch="facebook"><span>👥</span> Facebook</div>
             <div class="ch-pill" onclick="pickManualCh(this,'instagram')" data-ch="instagram"><span>📸</span> Instagram</div>
-            <div class="ch-pill" onclick="pickManualCh(this,'tiktok')" data-ch="tiktok"><span>🎵</span> TikTok</div>
+            <div class="ch-pill" onclick="pickManualCh(this,'tiktok')" data-ch="tiktok" style="display:none"><span>🎵</span> TikTok</div>
           </div>
           <div style="font-size:11px;color:#9ca3af;margin-top:4px">Välj en eller flera kanaler — ett inlägg skapas per kanal.</div>
         </div>
@@ -577,7 +577,7 @@ textarea.field-input{resize:none;line-height:1.5}
               <button class="tag-add-btn" onclick="addManualTag()">+</button>
             </div>
           </div>
-          <div>
+          <div style="display:none">
             <div class="field-label">Call-to-Action</div>
             <input class="field-input" id="m-cta" placeholder="t.ex. Besök vår webbplats!" oninput="updateManualPreview()">
           </div>
@@ -613,7 +613,7 @@ textarea.field-input{resize:none;line-height:1.5}
                 <div class="ch-pill active" onclick="toggleModalCh(this,'instagram')" data-ch="instagram">📸 Instagram</div>
                 <div class="ch-pill active" onclick="toggleModalCh(this,'linkedin')"  data-ch="linkedin">💼 LinkedIn</div>
                 <div class="ch-pill active" onclick="toggleModalCh(this,'facebook')"  data-ch="facebook">👥 Facebook</div>
-                <div class="ch-pill active" onclick="toggleModalCh(this,'tiktok')"    data-ch="tiktok">🎵 TikTok</div>
+                <div class="ch-pill active" onclick="toggleModalCh(this,'tiktok')"    data-ch="tiktok" style="display:none">🎵 TikTok</div>
               </div>
             </div>
             <div style="display:flex;gap:8px">
