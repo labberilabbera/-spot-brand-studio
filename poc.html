@@ -1162,7 +1162,8 @@ function _withImgBg(post, inner) {
 const SERIF = "'Higuen','Higuen Regular',Georgia,'Times New Roman',serif";
 // Bild (uppladdad/AI) eller grå platshållare – fyller en position:relative-container
 function _imgOrGray(post) {
-  if (post.imageUrl) return `<img src="${post.imageUrl}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${_imgObjPos(post)};filter:${_imgStyleProps(post).f};display:block">`;
+  const _imgSrc = post.imageUrl || post.aiImageUrl;
+  if (_imgSrc) return `<img src="${_imgSrc}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${_imgObjPos(post)};filter:${_imgStyleProps(post).f};display:block">`;
   return `<div style="position:absolute;inset:0;background:linear-gradient(160deg,#c4c4c4 0%,#8a8a8a 55%,#5e5e5e 100%)"></div>`;
 }
 
@@ -2396,7 +2397,7 @@ const BLOCK_META = {
   hashtags: { icon: '#',  label: 'Hashtags' },
   cta:      { icon: '🔲', label: 'Call-to-Action' },
 };
-const DEFAULT_BLOCK_ORDER = ['brand','title','content','hashtags','cta'];
+const DEFAULT_BLOCK_ORDER = ['brand','title','content','hashtags'];
 
 let dndDragSrc = null;
 
@@ -2407,6 +2408,7 @@ function renderCanvasEditor(post) {
 
 function openEditorModal(post) {
   if (!post.blocks) post.blocks = [...DEFAULT_BLOCK_ORDER];
+  post.blocks = post.blocks.filter(function(b){ return b !== 'cta'; });
   S._editPost = post; // working copy reference
   S._editImgUndoStack = [];
 
