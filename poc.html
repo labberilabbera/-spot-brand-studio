@@ -1341,10 +1341,11 @@ function getPostImageLargeHTML(post) {
   if (layout === 'studio' || layout === 'case' || layout === 'louisiana') {
     return getPostImageHTML(post, 'large');
   }
-  const t = post.title || '';
-  const c = post.content || '';
+  const _blocksL = post.blocks || ['brand','title','content','hashtags','cta'];
+  const t = _blocksL.includes('title') ? (post.title || '') : '';
+  const c = _blocksL.includes('content') ? (post.content || '') : '';
   const cta = '';
-  const tags = (post.hashtags || []).map(t=>`#${t.replace(/^#/,'')}`).join(' ');
+  const tags = _blocksL.includes('hashtags') ? (post.hashtags || []).map(t=>`#${t.replace(/^#/,'')}`).join(' ') : '';
   const grad = CH_GRAD[post.channel] || CH_GRAD.instagram;
 
   if (layout === 'gradient') return `
@@ -2414,6 +2415,7 @@ function openEditorModal(post) {
   S._editPost = post; // working copy reference
   S._editImgUndoStack = [];
   S._editBlockUndoStack = [];
+  S._editTextUndoStack = [];
 
   // Build left panel (form fields + block order)
   const left = document.getElementById('emLeft');
@@ -2421,11 +2423,11 @@ function openEditorModal(post) {
   left.innerHTML = `
     <div>
       <div class="em-field-label">Titel</div>
-      <input id="em-title" class="em-input" value="${(post.title||'').replace(/"/g,'&quot;')}" placeholder="Titel..." oninput="emSyncFromForm()">
+      <input id="em-title" class="em-input" value="${(post.title||'').replace(/"/g,'&quot;')}" placeholder="Titel..." onfocus="emSnapshotText()" oninput="emSyncFromForm()">
     </div>
     <div>
       <div class="em-field-label">Innehåll</div>
-      <textarea id="em-content" class="em-input em-textarea" rows="5" placeholder="Innehåll..." oninput="emSyncFromForm()">${post.content||''}</textarea>
+      <textarea id="em-content" class="em-input em-textarea" rows="5" placeholder="Innehåll..." onfocus="emSnapshotText()" oninput="emSyncFromForm()">${post.content||''}</textarea>
     </div>
     <div>
       <div class="em-field-label">Hashtags</div>
@@ -2435,6 +2437,7 @@ function openEditorModal(post) {
           onkeydown="if(event.key==='Enter'){emAddTag();event.preventDefault()}">
         <button onclick="emAddTag()" style="padding:8px 14px;background:#f3f4f6;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid #e5e7eb">+</button>
       </div>
+      <button id="emTextUndoBtn" onclick="emUndoText()" style="display:${(S._editTextUndoStack&&S._editTextUndoStack.length)?'inline-flex':'none'};margin-top:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:1.5px solid #e5e7eb;background:#fff;color:#374151;cursor:pointer">↶ Ångra text</button>
     </div>
     <div>
       <div class="em-field-label">🎨 Bild</div>
@@ -2550,10 +2553,35 @@ function emUndoRemoveBlock(){
   const post = S._editPost;
   if (!post || !S._editBlockUndoStack || !S._editBlockUndoStack.length) return;
   const last = S._editBlockUndoStack.pop();
-  if (!post.blocks) post.blocks = [];
-  post.blocks.splice(Math.min(last.index, post.blocks.length), 0, last.block);
+  if (last.reorder) {
+    post.blocks = last.blocks;
+  } else {
+    if (!post.blocks) post.blocks = [];
+    post.blocks.splice(Math.min(last.index, post.blocks.length), 0, last.block);
+  }
   openEditorModal(post);
-  if (typeof showToast==='function') showToast('↶ Block återställt');
+  if (typeof showToast==='function') showToast('↶ Blockändring återställd');
+}
+function emSnapshotText(){
+  const post = S._editPost;
+  if (!post) return;
+  S._editTextUndoStack = S._editTextUndoStack || [];
+  S._editTextUndoStack.push({ title: post.title, content: post.content, hashtags: [...(post.hashtags||[])] });
+  const tb = document.getElementById('emTextUndoBtn'); if (tb) tb.style.display = 'inline-flex';
+}
+function emUndoText(){
+  const post = S._editPost;
+  if (!post || !S._editTextUndoStack || !S._editTextUndoStack.length) return;
+  const last = S._editTextUndoStack.pop();
+  post.title = last.title;
+  post.content = last.content;
+  post.hashtags = last.hashtags;
+  if (typeof emSyncToForm === 'function') { emSyncToForm('title', post.title||''); emSyncToForm('content', post.content||''); }
+  const container = document.getElementById('em-tags');
+  if (container) container.innerHTML = (post.hashtags||[]).map(function(t){ return '<span class="tag-edit">#' + t.replace(/^#/,'') + '<span class="tag-rm" onclick="emRmTag(\'' + t.replace(/^#/,'') + '\')">✕</span></span>'; }).join('');
+  if (!S._editTextUndoStack.length) { const tb = document.getElementById('emTextUndoBtn'); if (tb) tb.style.display = 'none'; }
+  emRenderPreview();
+  if (typeof showToast==='function') showToast('↶ Text återställd');
 }
 function emUndoImage(){
   const post = S._editPost;
@@ -2577,6 +2605,7 @@ function emAddTag() {
   const val = (inp.value||'').trim().replace(/^#/, '');
   if (!val) return;
   const post = S._editPost;
+  emSnapshotText();
   if (!post.hashtags) post.hashtags = [];
   if (!post.hashtags.includes(val)) post.hashtags.push(val);
   inp.value = '';
@@ -2589,6 +2618,7 @@ function emAddTag() {
 function emRmTag(tag) {
   const post = S._editPost;
   if (!post) return;
+  emSnapshotText();
   post.hashtags = (post.hashtags||[]).filter(t => t.replace(/^#/,'') !== tag);
   const container = document.getElementById('em-tags');
   if (container) container.innerHTML = post.hashtags.map(t=>`<span class="tag-edit">#${t.replace(/^#/,'')}<span class="tag-rm" onclick="emRmTag('${t.replace(/^#/,'')}')">✕</span></span>`).join('');
@@ -2624,7 +2654,10 @@ function emAttachDnd(post) {
       const tgtIdx = allBlocks.indexOf(el);
       if (srcIdx < tgtIdx) container.insertBefore(dndDragSrc, el.nextSibling);
       else container.insertBefore(dndDragSrc, el);
+      S._editBlockUndoStack = S._editBlockUndoStack || [];
+      S._editBlockUndoStack.push({ reorder: true, blocks: [...post.blocks] });
       post.blocks = [...container.querySelectorAll('.dnd-block')].map(b => b.dataset.block);
+      const _ubR = document.getElementById('emBlockUndoBtn'); if (_ubR) _ubR.style.display = 'inline-flex';
       emRenderPreview();
       dndDragSrc = null;
     });
