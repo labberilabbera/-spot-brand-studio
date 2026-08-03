@@ -264,6 +264,32 @@ app.post('/api/linkedin/publish', auth, async (req, res) => {
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
+async function ensureBrandImagesTable() { await getAuthPool().query("CREATE TABLE IF NOT EXISTS brand_images (id SERIAL PRIMARY KEY, name TEXT, url TEXT, ts BIGINT)") }
+app.get('/api/brand-images', auth, async (req, res) => {
+  try {
+    await ensureBrandImagesTable()
+    const r = await getAuthPool().query('SELECT id, name, url, ts FROM brand_images ORDER BY ts DESC')
+    res.json({ images: r.rows })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.post('/api/brand-images', auth, async (req, res) => {
+  try {
+    const { name, url } = req.body || {}
+    if (!url) return res.status(400).json({ error: 'Ingen bild skickades' })
+    await ensureBrandImagesTable()
+    const ts = Date.now()
+    const r = await getAuthPool().query('INSERT INTO brand_images (name,url,ts) VALUES ($1,$2,$3) RETURNING id', [name || 'bild', url, ts])
+    res.json({ ok: true, id: r.rows[0].id, ts })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.post('/api/brand-images/delete', auth, async (req, res) => {
+  try {
+    const { id } = req.body || {}
+    await ensureBrandImagesTable()
+    await getAuthPool().query('DELETE FROM brand_images WHERE id=$1', [id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
 app.listen(PORT, () => console.log('spot. running on ' + PORT))
 const LOGIN_HTML = '<!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"/><title>spot.</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Segoe UI,sans-serif;background:#0f0f0f;min-height:100vh;display:flex;align-items:center;justify-content:center}.c{background:#fff;border-radius:20px;padding:40px 36px;width:min(380px,92vw);box-shadow:0 24px 60px rgba(0,0,0,.4)}.logo{font-size:28px;font-weight:800;color:#b31e59;margin-bottom:4px}.tag{font-size:13px;color:#9ca3af;margin-bottom:32px}.f{margin-bottom:16px}label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px}input{width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:15px;outline:none;font-family:inherit}input:focus{border-color:#b31e59}.err{color:#b31e59;font-size:13px;margin-top:8px;display:none}.err.show{display:block}button{width:100%;margin-top:8px;padding:13px;background:#b31e59;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}</style></head><body><div class="c"><div class="logo">spot.</div><div class="tag">content studio</div><form method="POST" action="/login"><div class="f"><label>Användarnamn</label><input type="text" name="username" autofocus/></div><div class="f"><label>Lösenord</label><input type="password" name="password"/></div><div class="err" id="err">Fel.</div><button type="submit">Logga in</button><div style="text-align:center;margin-top:14px"><a href="/forgot" style="font-size:12px;color:#9ca3af;text-decoration:none">Glömt lösenord?</a></div><div class="ok" id="ok" style="display:none;color:#16a34a;font-size:13px;margin-top:8px;text-align:center">Lösenordet är återställt. Logga in med det nya lösenordet.</div></form></div><script>var q=new URLSearchParams(location.search);if(q.get("err"))document.getElementById("err").classList.add("show");if(q.get("reset"))document.getElementById("ok").style.display="block"<\/script></body></html>'
 
