@@ -2462,7 +2462,6 @@ function openEditorModal(post) {
         }).join('')}
       </div>
       <button id="emBlockUndoBtn" onclick="emUndoRemoveBlock()" style="display:none;margin-top:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:1.5px solid #e5e7eb;background:#fff;color:#374151;cursor:pointer">↶ Ångra borttagning</button>
-      </div>
     </div>`;
 
   // Build right panel (live editable preview)
@@ -2533,6 +2532,26 @@ async function emRepromptImage(){
   } finally {
     if (btn) { btn.textContent = oldText || 'Ny bild'; btn.disabled = false; }
   }
+}
+function emRemoveBlock(bk){
+  const post = S._editPost;
+  if (!post || !post.blocks) return;
+  const idx = post.blocks.indexOf(bk);
+  if (idx === -1) return;
+  S._editBlockUndoStack = S._editBlockUndoStack || [];
+  S._editBlockUndoStack.push({ block: bk, index: idx });
+  post.blocks.splice(idx, 1);
+  const ub = document.getElementById('emBlockUndoBtn'); if (ub) ub.style.display = 'inline-flex';
+  openEditorModal(post);
+}
+function emUndoRemoveBlock(){
+  const post = S._editPost;
+  if (!post || !S._editBlockUndoStack || !S._editBlockUndoStack.length) return;
+  const last = S._editBlockUndoStack.pop();
+  if (!post.blocks) post.blocks = [];
+  post.blocks.splice(Math.min(last.index, post.blocks.length), 0, last.block);
+  openEditorModal(post);
+  if (typeof showToast==='function') showToast('↶ Block återställt');
 }
 function emUndoImage(){
   const post = S._editPost;
