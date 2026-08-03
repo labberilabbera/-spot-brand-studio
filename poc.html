@@ -2647,9 +2647,37 @@ function saveEditorModal() {
   if (c)  post.content = c.value;
   if (ca) post.cta     = ca.value;
   document.getElementById('editorModal').classList.remove('open');
-  S.editMode = false; S._editPost = null;
-  renderReview(); renderDetailPanel();
-  showToast('✅ Ändringar sparade');
+  S.editMode = false;
+  if (S._editIsCreateMode) {
+    S._editIsCreateMode = false;
+    if (typeof fillFormFromProposal === 'function') fillFormFromProposal(post);
+    S._uploadedImageUrl = post.imageUrl || post.aiImageUrl || S._uploadedImageUrl;
+    S._aiImageUrl = post.imageUrl || post.aiImageUrl || S._aiImageUrl;
+    if (typeof updateManualPreview === 'function') updateManualPreview();
+    S._editPost = null;
+    showToast('✅ Ändringar sparade');
+  } else {
+    S._editPost = null;
+    renderReview(); renderDetailPanel();
+    showToast('✅ Ändringar sparade');
+  }
+}
+function openCreateEditor() {
+  const t  = document.getElementById('m-title');
+  const c  = document.getElementById('m-content');
+  const ca = document.getElementById('m-cta');
+  const tempPost = {
+    id: 'create-draft',
+    channel: S.manualChannel || (S.manualChannels && S.manualChannels[0]) || 'linkedin',
+    title: t ? t.value : '',
+    content: c ? c.value : '',
+    hashtags: [...(S.manualTags||[])],
+    cta: ca ? ca.value : '',
+    imageUrl: (typeof activeImageUrl === 'function') ? activeImageUrl() : null,
+    imgPos: S._imgPos || null,
+  };
+  S._editIsCreateMode = true;
+  openEditorModal(tempPost);
 }
 
 // Keep old helpers for compatibility
