@@ -89,7 +89,7 @@ textarea,input{font-family:inherit}
 .ai-prop-title{font-size:12px;font-weight:600;color:#111;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ai-prop-hint{font-size:10px;color:#9ca3af;margin-top:2px}
 .ai-prop-card.selected .ai-prop-num{color:#b31e59}
-.prop-zoom-btn{position:absolute;top:5px;right:5px;width:24px;height:24px;border-radius:6px;background:rgba(0,0,0,.45);color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;border:none;cursor:pointer;backdrop-filter:blur(2px)}
+.prop-zoom-btn{position:absolute;top:5px;right:5px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:1;transition:opacity .15s,background .15s;border:2px solid rgba(255,255,255,.8);cursor:pointer;backdrop-filter:blur(2px);z-index:3}
 .ai-prop-thumb:hover .prop-zoom-btn{opacity:1}
 /* proposal zoom lightbox */
 #propZoomModal{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;display:none;align-items:center;justify-content:center;gap:24px}
@@ -564,7 +564,7 @@ textarea.field-input{resize:none;line-height:1.5}
           </div>
           <div id="imgEditControls" style="display:none;flex-direction:column;gap:6px;margin-top:8px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#6b7280;font-weight:600">Zoom</span><input type="range" id="imgZoom" min="1" max="3" step="0.05" value="1" oninput="setImgZoom(this.value)" style="flex:1"></div><div id="imgRepromptRow" style="display:none;gap:6px"><input id="imgReprompt" placeholder="Beskriv en ändring av bilden (valfritt)..." style="flex:1;font-size:12px;border:1.5px solid #e5e7eb;border-radius:8px;padding:6px 8px;font-family:inherit"><button onclick="repromptImage()" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:none;background:var(--m);color:#fff;cursor:pointer;white-space:nowrap">🎨 Ny bild</button></div></div>
           <input type="file" id="imgFileInput" accept="image/*" style="display:none" onchange="handleImgSelect(event)">
-          <div style="display:flex;gap:8px"><button id="imgSwapBtn" onclick="document.getElementById('imgFileInput').click()" style="display:none;font-size:12px;color:#374151;border:1.5px solid #e5e7eb;border-radius:8px;padding:5px 12px;background:#fff;cursor:pointer">🔄 Byt bild</button><button id="imgRemoveBtn" onclick="removeImg()" style="display:none;font-size:12px;color:#ef4444;border:1.5px solid #fecaca;border-radius:8px;padding:5px 12px;background:#fff;cursor:pointer">✕ Ta bort bild</button></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button onclick="openLibraryPicker()" style="font-size:12px;color:#374151;border:1.5px solid #e5e7eb;border-radius:8px;padding:5px 12px;background:#fff;cursor:pointer">📚 Från bibliotek</button><button id="imgSwapBtn" onclick="document.getElementById('imgFileInput').click()" style="display:none;font-size:12px;color:#374151;border:1.5px solid #e5e7eb;border-radius:8px;padding:5px 12px;background:#fff;cursor:pointer">🔄 Byt bild</button><button id="imgRemoveBtn" onclick="removeImg()" style="display:none;font-size:12px;color:#ef4444;border:1.5px solid #fecaca;border-radius:8px;padding:5px 12px;background:#fff;cursor:pointer">✕ Ta bort bild</button></div>
         </div>
 
         <!-- HASHTAGS & CTA -->
