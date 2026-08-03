@@ -290,6 +290,34 @@ app.post('/api/brand-images/delete', auth, async (req, res) => {
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
+async function ensureDraftsTable() { await getAuthPool().query("CREATE TABLE IF NOT EXISTS user_drafts (id SERIAL PRIMARY KEY, username TEXT, data JSONB, ts BIGINT)") }
+app.get('/api/drafts', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    await ensureDraftsTable()
+    const r = await getAuthPool().query('SELECT id, data, ts FROM user_drafts WHERE username=$1 ORDER BY ts DESC', [s.u])
+    res.json({ drafts: r.rows.map(row => Object.assign({}, row.data, { id: row.id, ts: row.ts })) })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.post('/api/drafts', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    const draft = req.body || {}
+    await ensureDraftsTable()
+    const ts = Date.now()
+    const r = await getAuthPool().query('INSERT INTO user_drafts (username,data,ts) VALUES ($1,$2,$3) RETURNING id', [s.u, JSON.stringify(draft), ts])
+    res.json({ ok: true, id: r.rows[0].id, ts })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.post('/api/drafts/delete', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    const { id } = req.body || {}
+    await ensureDraftsTable()
+    await getAuthPool().query('DELETE FROM user_drafts WHERE id=$1 AND username=$2', [id, s.u])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
 app.listen(PORT, () => console.log('spot. running on ' + PORT))
 const LOGIN_HTML = '<!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"/><title>spot.</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Segoe UI,sans-serif;background:#0f0f0f;min-height:100vh;display:flex;align-items:center;justify-content:center}.c{background:#fff;border-radius:20px;padding:40px 36px;width:min(380px,92vw);box-shadow:0 24px 60px rgba(0,0,0,.4)}.logo{font-size:28px;font-weight:800;color:#b31e59;margin-bottom:4px}.tag{font-size:13px;color:#9ca3af;margin-bottom:32px}.f{margin-bottom:16px}label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px}input{width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:15px;outline:none;font-family:inherit}input:focus{border-color:#b31e59}.err{color:#b31e59;font-size:13px;margin-top:8px;display:none}.err.show{display:block}button{width:100%;margin-top:8px;padding:13px;background:#b31e59;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}</style></head><body><div class="c"><div class="logo">spot.</div><div class="tag">content studio</div><form method="POST" action="/login"><div class="f"><label>Användarnamn</label><input type="text" name="username" autofocus/></div><div class="f"><label>Lösenord</label><input type="password" name="password"/></div><div class="err" id="err">Fel.</div><button type="submit">Logga in</button><div style="text-align:center;margin-top:14px"><a href="/forgot" style="font-size:12px;color:#9ca3af;text-decoration:none">Glömt lösenord?</a></div><div class="ok" id="ok" style="display:none;color:#16a34a;font-size:13px;margin-top:8px;text-align:center">Lösenordet är återställt. Logga in med det nya lösenordet.</div></form></div><script>var q=new URLSearchParams(location.search);if(q.get("err"))document.getElementById("err").classList.add("show");if(q.get("reset"))document.getElementById("ok").style.display="block"<\/script></body></html>'
 
