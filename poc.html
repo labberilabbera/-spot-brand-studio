@@ -929,7 +929,7 @@ const S = {
 (function(){ try{ var _as=JSON.parse(localStorage.getItem('spotAppState')||'null'); if(_as){ if(Array.isArray(_as.reviewQueue))S.reviewQueue=_as.reviewQueue; if(Array.isArray(_as.publishedPosts))S.publishedPosts=_as.publishedPosts; if(_as.archiveOverride)S.archiveOverride=_as.archiveOverride; } }catch(e){} })();
 function _saveAppState(){ try{ localStorage.setItem('spotAppState', JSON.stringify({reviewQueue:S.reviewQueue, publishedPosts:S.publishedPosts, archiveOverride:S.archiveOverride})); }catch(e){} }
 var CURRENT_ROLE = 'admin';
-function _loadUserInfo(){ fetch('/api/me').then(function(r){ return r.json(); }).then(function(u){ var el=document.getElementById('avatarInitials'); if(el && u.initials) el.textContent=u.initials; var el2=document.getElementById('avatarInitials2'); if(el2 && u.initials) el2.textContent=u.initials; var btn=document.getElementById('avatarBtn'); if(btn && u.firstName) btn.title=u.firstName+' '+u.lastName; var nameEl=document.getElementById('userFullName'); if(nameEl) nameEl.textContent=(u.firstName||'')+' '+(u.lastName||''); CURRENT_ROLE = u.role || 'admin'; applyRolePermissions(); if (typeof _loadMyChannels === 'function') _loadMyChannels(); if (typeof _loadLinkedInStatus === 'function') _loadLinkedInStatus(); }).catch(function(){}); }
+function _loadUserInfo(){ fetch('/api/me').then(function(r){ return r.json(); }).then(function(u){ var el=document.getElementById('avatarInitials'); if(el && u.initials) el.textContent=u.initials; var el2=document.getElementById('avatarInitials2'); if(el2 && u.initials) el2.textContent=u.initials; var btn=document.getElementById('avatarBtn'); if(btn && u.firstName) btn.title=u.firstName+' '+u.lastName; var nameEl=document.getElementById('userFullName'); if(nameEl) nameEl.textContent=(u.firstName||'')+' '+(u.lastName||''); CURRENT_ROLE = u.role || 'admin'; applyRolePermissions(); if (typeof _loadMyChannels === 'function') _loadMyChannels(); if (typeof _loadLinkedInStatus === 'function') _loadLinkedInStatus(); if (typeof _loadImgLibrary === 'function') _loadImgLibrary(); }).catch(function(){}); }
 function applyRolePermissions(){
   var isAdmin = CURRENT_ROLE === 'admin';
   var isGranskare = CURRENT_ROLE === 'granskare';
@@ -942,8 +942,9 @@ function applyRolePermissions(){
   document.querySelectorAll('button[onclick^="rejectPost("]').forEach(function(b){ b.style.display = isGranskare ? 'none' : ''; });
 }
 _loadUserInfo();
-function _getImgLib(){ try{ return JSON.parse(localStorage.getItem('spotImgLibrary')||'[]'); }catch(e){ return []; } }
-function _setImgLib(a){ try{ localStorage.setItem('spotImgLibrary', JSON.stringify(a)); return true; }catch(e){ return false; } }
+var _imgLibCache = [];
+function _getImgLib(){ return _imgLibCache; }
+function _loadImgLibrary(){ fetch('/api/brand-images').then(function(r){return r.json();}).then(function(data){ _imgLibCache = data.images || []; renderImgLibrary(); }).catch(function(){}); }
 function openLibraryPicker(){
   var modal = document.getElementById('libPickerModal');
   var grid = document.getElementById('libPickerGrid');
@@ -996,19 +997,21 @@ function uploadLibraryImages(input){
     showToast('⚠️ ' + tooBig.length + ' bild(er) är för stora (max 5 MB) och hoppades över.');
   }
   if (!files.length) { input.value = ''; return; }
-  var lib = _getImgLib();
-  var remaining = files.length;
+  var remaining = files.length, okCount = 0;
   files.forEach(function(file){
     var reader = new FileReader();
     reader.onload = function(e){
-      lib.push({ url: e.target.result, name: file.name, ts: Date.now() });
-      remaining--;
-      if (remaining === 0) {
-        var ok = _setImgLib(lib);
-        if (!ok) { showToast('⚠️ Lagringen är full — ta bort någon bild.'); }
-        else { showToast('📤 Bild uppladdad!'); }
-        renderImgLibrary();
-      }
+      fetch('/api/brand-images', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name:file.name, url:e.target.result }) })
+        .then(function(r){ return r.json(); })
+        .then(function(res){
+          if (res.ok) { _imgLibCache.unshift({ id:res.id, name:file.name, url:e.target.result, ts:res.ts }); okCount++; }
+          remaining--;
+          if (remaining === 0) {
+            if (okCount > 0 && typeof showToast === 'function') showToast('📤 ' + okCount + ' bild(er) uppladdade!');
+            renderImgLibrary();
+          }
+        })
+        .catch(function(){ remaining--; if (remaining === 0) renderImgLibrary(); });
     };
     reader.readAsDataURL(file);
   });
@@ -1016,9 +1019,11 @@ function uploadLibraryImages(input){
 }
 function deleteLibraryImage(i){
   var lib = _getImgLib();
-  lib.splice(i, 1);
-  _setImgLib(lib);
-  renderImgLibrary();
+  var img = lib[i];
+  if (!img) return;
+  fetch('/api/brand-images/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: img.id }) })
+    .then(function(){ _imgLibCache.splice(i, 1); renderImgLibrary(); })
+    .catch(function(){ _imgLibCache.splice(i, 1); renderImgLibrary(); });
 }
 function downloadSingleImage(i){
   var lib = _getImgLib();
