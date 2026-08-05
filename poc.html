@@ -1976,11 +1976,11 @@ function saveDraft(){
 }
 function deleteDraft(id){
   fetch("/api/drafts/delete", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({id:id}) })
-    .then(function(){ _draftsCache = _draftsCache.filter(function(x){return x.id!==id;}); renderDraftsPanel(); })
-    .catch(function(){ _draftsCache = _draftsCache.filter(function(x){return x.id!==id;}); renderDraftsPanel(); });
+    .then(function(){ _draftsCache = _draftsCache.filter(function(x){return String(x.id)!==String(id);}); renderDraftsPanel(); })
+    .catch(function(){ _draftsCache = _draftsCache.filter(function(x){return String(x.id)!==String(id);}); renderDraftsPanel(); });
 }
 function openDraft(id){
-  var dft=_getDrafts().filter(function(x){return x.id===id;})[0]; if(!dft)return;
+  var dft=_getDrafts().filter(function(x){return String(x.id)===String(id);})[0]; if(!dft)return;
   if(typeof navigate==="function")navigate("create");
   setTimeout(function(){
     var t=document.getElementById("m-title"); if(t)t.value=dft.title||"";
