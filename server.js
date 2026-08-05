@@ -18,9 +18,11 @@ async function ensureAuthTable() { await getAuthPool().query("CREATE TABLE IF NO
 async function ensureUsersTable() {
   await getAuthPool().query("CREATE TABLE IF NOT EXISTS app_users (username TEXT PRIMARY KEY, password TEXT, role TEXT, first_name TEXT, last_name TEXT)")
   await getAuthPool().query("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email TEXT")
+  await getAuthPool().query("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS workspace TEXT DEFAULT 'spot'")
+  await getAuthPool().query("UPDATE app_users SET workspace='spot' WHERE workspace IS NULL")
   const r = await getAuthPool().query("SELECT COUNT(*) FROM app_users")
   if (parseInt(r.rows[0].count, 10) === 0) {
-    await getAuthPool().query("INSERT INTO app_users (username,password,role,first_name,last_name) VALUES ($1,$2,$3,$4,$5),($6,$7,$8,$9,$10),($11,$12,$13,$14,$15)", [
+    await getAuthPool().query("INSERT INTO app_users (username,password,role,first_name,last_name,workspace) VALUES ($1,$2,$3,$4,$5,'spot'),($6,$7,$8,$9,$10,'spot'),($11,$12,$13,$14,$15,'spot')", [
       'admin', '1234', 'admin', 'Anna', 'Andersson',
       'redaktor', '1234', 'redaktor', 'Erik', 'Eriksson',
       'granskare', '1234', 'granskare', 'Gustav', 'Granberg'
@@ -49,20 +51,20 @@ app.post('/login', async (req, res) => {
   const u = await getUserByUsername(username)
   if (u && password === u.password) {
     const t = makeToken()
-    sessions[t] = { u: u.username, role: u.role, firstName: u.first_name, lastName: u.last_name }
+    sessions[t] = { u: u.username, role: u.role, firstName: u.first_name, lastName: u.last_name, workspace: u.workspace || 'spot' }
     res.setHeader('Set-Cookie', 'spot_session=' + t + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + (60*60*24*7))
     return res.redirect('/')
   }
   if (username === UNAME && password === await getPassword()) {
     const t = makeToken()
-    sessions[t] = { u: username, role: 'admin', firstName: process.env.APP_USER_FIRSTNAME || 'Spot', lastName: process.env.APP_USER_LASTNAME || 'Admin' }
+    sessions[t] = { u: username, role: 'admin', firstName: process.env.APP_USER_FIRSTNAME || 'Spot', lastName: process.env.APP_USER_LASTNAME || 'Admin', workspace: 'spot' }
     res.setHeader('Set-Cookie', 'spot_session=' + t + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + (60*60*24*7))
     return res.redirect('/')
   }
   res.redirect('/login?err=1')
 })
 app.post('/logout', (req, res) => { delete sessions[getToken(req)]; res.setHeader('Set-Cookie', 'spot_session=; Path=/; Max-Age=0'); res.json({ ok: true }) })
-app.get('/api/me', auth, (req, res) => { const s = sessions[getToken(req)] || {}; const firstName = s.firstName || 'Spot'; const lastName = s.lastName || 'Admin'; const role = s.role || 'admin'; const initials = (firstName[0]||'') + (lastName[0]||''); res.json({ firstName, lastName, role, initials: initials.toUpperCase() }) })
+app.get('/api/me', auth, (req, res) => { const s = sessions[getToken(req)] || {}; const firstName = s.firstName || 'Spot'; const lastName = s.lastName || 'Admin'; const role = s.role || 'admin'; const initials = (firstName[0]||'') + (lastName[0]||''); res.json({ firstName, lastName, role, workspace: s.workspace || 'spot', initials: initials.toUpperCase() }) })
 async function ensureChannelsTable() { await getAuthPool().query("CREATE TABLE IF NOT EXISTS user_channels (username TEXT, platform TEXT, handle TEXT, PRIMARY KEY (username, platform))") }
 app.get('/api/channels', auth, async (req, res) => {
   try {
@@ -128,8 +130,9 @@ app.post('/api/team/role', auth, async (req, res) => {
 })
 app.get('/api/team/members', auth, async (req, res) => {
   try {
+    const s = sessions[getToken(req)] || {}
     await ensureUsersTable()
-    const r = await getAuthPool().query('SELECT username, role, first_name, last_name, email FROM app_users ORDER BY username')
+    const r = await getAuthPool().query('SELECT username, role, first_name, last_name, email FROM app_users WHERE workspace=$1 ORDER BY username', [s.workspace || 'spot'])
     res.json({ members: r.rows })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -264,29 +267,32 @@ app.post('/api/linkedin/publish', auth, async (req, res) => {
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
-async function ensureBrandImagesTable() { await getAuthPool().query("CREATE TABLE IF NOT EXISTS brand_images (id SERIAL PRIMARY KEY, name TEXT, url TEXT, ts BIGINT)") }
+async function ensureBrandImagesTable() { await getAuthPool().query("CREATE TABLE IF NOT EXISTS brand_images (id SERIAL PRIMARY KEY, name TEXT, url TEXT, ts BIGINT)"); await getAuthPool().query("ALTER TABLE brand_images ADD COLUMN IF NOT EXISTS workspace TEXT DEFAULT 'spot'") }
 app.get('/api/brand-images', auth, async (req, res) => {
   try {
+    const s = sessions[getToken(req)] || {}
     await ensureBrandImagesTable()
-    const r = await getAuthPool().query('SELECT id, name, url, ts FROM brand_images ORDER BY ts DESC')
+    const r = await getAuthPool().query('SELECT id, name, url, ts FROM brand_images WHERE workspace=$1 ORDER BY ts DESC', [s.workspace || 'spot'])
     res.json({ images: r.rows })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 app.post('/api/brand-images', auth, async (req, res) => {
   try {
+    const s = sessions[getToken(req)] || {}
     const { name, url } = req.body || {}
     if (!url) return res.status(400).json({ error: 'Ingen bild skickades' })
     await ensureBrandImagesTable()
     const ts = Date.now()
-    const r = await getAuthPool().query('INSERT INTO brand_images (name,url,ts) VALUES ($1,$2,$3) RETURNING id', [name || 'bild', url, ts])
+    const r = await getAuthPool().query('INSERT INTO brand_images (name,url,ts,workspace) VALUES ($1,$2,$3,$4) RETURNING id', [name || 'bild', url, ts, s.workspace || 'spot'])
     res.json({ ok: true, id: r.rows[0].id, ts })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 app.post('/api/brand-images/delete', auth, async (req, res) => {
   try {
+    const s = sessions[getToken(req)] || {}
     const { id } = req.body || {}
     await ensureBrandImagesTable()
-    await getAuthPool().query('DELETE FROM brand_images WHERE id=$1', [id])
+    await getAuthPool().query('DELETE FROM brand_images WHERE id=$1 AND workspace=$2', [id, s.workspace || 'spot'])
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
