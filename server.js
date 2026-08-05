@@ -361,6 +361,63 @@ app.post('/api/admin/create-workspace', auth, async (req, res) => {
     res.json({ ok: true, workspaceId, username })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
+app.get('/api/export-workspace', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    const ws = s.workspace || 'spot'
+    await ensureBrandTable(); await ensureBrandImagesTable(); await ensureDraftsTable(); await ensureUsersTable()
+    const brandRow = await getAuthPool().query('SELECT data FROM workspace_brand WHERE workspace=$1', [ws])
+    const images = await getAuthPool().query('SELECT name, url, ts FROM brand_images WHERE workspace=$1', [ws])
+    const drafts = await getAuthPool().query('SELECT data, ts FROM user_drafts WHERE username IN (SELECT username FROM app_users WHERE workspace=$1)', [ws])
+    const members = await getAuthPool().query('SELECT username, role, first_name, last_name, email FROM app_users WHERE workspace=$1', [ws])
+    const { Pool } = require('pg')
+    const pgPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
+    let posts = []
+    try {
+      const pr = await pgPool.query("SELECT data FROM posts WHERE data->>'workspace' = $1", [ws])
+      posts = pr.rows.map(r => r.data)
+    } catch (e) {}
+    res.json({
+      workspace: ws,
+      exportedAt: new Date().toISOString(),
+      brand: brandRow.rows[0] ? brandRow.rows[0].data : null,
+      images: images.rows,
+      drafts: drafts.rows.map(r => Object.assign({}, r.data, { ts: r.ts })),
+      posts,
+      members: members.rows
+    })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.get('/api/admin/workspaces', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    if ((s.workspace || 'spot') !== 'spot' || s.role !== 'admin') return res.status(403).json({ error: 'Endast spot-admin' })
+    await ensureUsersTable()
+    const r = await getAuthPool().query('SELECT workspace, COUNT(*) as members FROM app_users GROUP BY workspace ORDER BY workspace')
+    res.json({ workspaces: r.rows })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.post('/api/admin/delete-workspace', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    if ((s.workspace || 'spot') !== 'spot' || s.role !== 'admin') return res.status(403).json({ error: 'Endast spot-admin' })
+    const { workspaceId } = req.body || {}
+    if (!workspaceId || workspaceId === 'spot') return res.status(400).json({ error: 'Ogiltig eller skyddad arbetsyta' })
+    await ensureUsersTable(); await ensureBrandTable(); await ensureBrandImagesTable(); await ensureDraftsTable()
+    await getAuthPool().query('DELETE FROM user_channels WHERE username IN (SELECT username FROM app_users WHERE workspace=$1)', [workspaceId])
+    await getAuthPool().query('DELETE FROM linkedin_accounts WHERE username IN (SELECT username FROM app_users WHERE workspace=$1)', [workspaceId])
+    await getAuthPool().query('DELETE FROM user_drafts WHERE username IN (SELECT username FROM app_users WHERE workspace=$1)', [workspaceId])
+    await getAuthPool().query('DELETE FROM brand_images WHERE workspace=$1', [workspaceId])
+    await getAuthPool().query('DELETE FROM workspace_brand WHERE workspace=$1', [workspaceId])
+    try {
+      const { Pool } = require('pg')
+      const pgPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
+      await pgPool.query("DELETE FROM posts WHERE data->>'workspace' = $1", [workspaceId])
+    } catch (e) {}
+    await getAuthPool().query('DELETE FROM app_users WHERE workspace=$1', [workspaceId])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
 app.listen(PORT, () => console.log('spot. running on ' + PORT))
 const LOGIN_HTML = '<!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"/><title>spot.</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Segoe UI,sans-serif;background:#0f0f0f;min-height:100vh;display:flex;align-items:center;justify-content:center}.c{background:#fff;border-radius:20px;padding:40px 36px;width:min(380px,92vw);box-shadow:0 24px 60px rgba(0,0,0,.4)}.logo{font-size:28px;font-weight:800;color:#b31e59;margin-bottom:4px}.tag{font-size:13px;color:#9ca3af;margin-bottom:32px}.f{margin-bottom:16px}label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px}input{width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:15px;outline:none;font-family:inherit}input:focus{border-color:#b31e59}.err{color:#b31e59;font-size:13px;margin-top:8px;display:none}.err.show{display:block}button{width:100%;margin-top:8px;padding:13px;background:#b31e59;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}</style></head><body><div class="c"><div class="logo">spot.</div><div class="tag">content studio</div><form method="POST" action="/login"><div class="f"><label>Användarnamn</label><input type="text" name="username" autofocus/></div><div class="f"><label>Lösenord</label><input type="password" name="password"/></div><div class="err" id="err">Fel.</div><button type="submit">Logga in</button><div style="text-align:center;margin-top:14px"><a href="/forgot" style="font-size:12px;color:#9ca3af;text-decoration:none">Glömt lösenord?</a></div><div class="ok" id="ok" style="display:none;color:#16a34a;font-size:13px;margin-top:8px;text-align:center">Lösenordet är återställt. Logga in med det nya lösenordet.</div></form></div><script>var q=new URLSearchParams(location.search);if(q.get("err"))document.getElementById("err").classList.add("show");if(q.get("reset"))document.getElementById("ok").style.display="block"<\/script></body></html>'
 
