@@ -1870,15 +1870,19 @@ function toggleModalCh(el, ch) {
 function getModalChannels() {
   return [...document.querySelectorAll('#modalChGrid .ch-pill.active')].map(p => p.dataset.ch);
 }
+var BRAND_NAME = 'spot.';
+var BRAND_TAGLINE = 'a creative studio';
+var BRAND_LOCATION = 'Halmstad, Sverige';
+var BRAND_TONE = 'Självständig, kreativ och avskalad. Aldrig överdrivet säljig. Kortfattad och träffsäker. Lowercase-känsla.';
 function getBrandProfile() {
   return {
-    name: 'spot.',
-    tagline: 'a creative studio',
-    location: 'Halmstad, Sverige',
+    name: BRAND_NAME,
+    tagline: BRAND_TAGLINE,
+    location: BRAND_LOCATION,
     colors: COLORS.map(c => `${c.name} (${c.hex}): ${c.use}`).join(', '),
     typography: 'Helvetica – bold för rubriker, regular för brödtext',
     visualStyle: 'Gråskaliga foton med magenta (#b31e59) accentfärg. Clean, minimalistisk estetik. Alltid lowercase varumärkesnamn.',
-    tone: 'Självständig, kreativ och avskalad. Aldrig överdrivet säljig. Kortfattad och träffsäker. Lowercase-känsla.',
+    tone: BRAND_TONE,
     services: 'Grafisk design, foto, innehållsproduktion, SoMe-mallar',
     dos: DOS_RULES.filter(r => r.active).map(r => r.text),
     donts: DONTS_RULES.filter(r => r.active).map(r => r.text),
