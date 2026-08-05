@@ -342,13 +342,23 @@ app.post('/api/brand', auth, async (req, res) => {
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
-app.post('/api/_debug/seed-ikea', async (req, res) => {
+app.post('/api/admin/create-workspace', auth, async (req, res) => {
   try {
+    const s = sessions[getToken(req)] || {}
+    if ((s.workspace || 'spot') !== 'spot' || s.role !== 'admin') return res.status(403).json({ error: 'Endast spot-admin kan skapa nya arbetsytor' })
+    const { companyName, adminUsername, adminPassword, adminFirstName, adminLastName } = req.body || {}
+    if (!companyName || !adminUsername || !adminPassword) return res.status(400).json({ error: 'Företagsnamn, användarnamn och lösenord krävs' })
+    if (String(adminPassword).length < 4) return res.status(400).json({ error: 'Lösenordet måste vara minst 4 tecken' })
     await ensureUsersTable()
+    const workspaceId = String(companyName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'workspace' + Date.now()
+    const username = String(adminUsername).toLowerCase().replace(/[^a-z0-9]/g, '')
+    const existing = await getAuthPool().query('SELECT 1 FROM app_users WHERE username=$1', [username])
+    if (existing.rows.length) return res.status(400).json({ error: 'Användarnamnet är upptaget' })
     await getAuthPool().query(
-      "INSERT INTO app_users (username,password,role,first_name,last_name,workspace) VALUES ('ikea_admin','1234','admin','Ikea','Admin','ikea') ON CONFLICT (username) DO UPDATE SET workspace='ikea'"
+      'INSERT INTO app_users (username,password,role,first_name,last_name,workspace) VALUES ($1,$2,$3,$4,$5,$6)',
+      [username, adminPassword, 'admin', adminFirstName || companyName, adminLastName || '', workspaceId]
     )
-    res.json({ ok: true, username: 'ikea_admin', password: '1234' })
+    res.json({ ok: true, workspaceId, username })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 app.listen(PORT, () => console.log('spot. running on ' + PORT))
