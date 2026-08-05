@@ -2981,8 +2981,33 @@ function setImgStyle(id) {
 }
 
 var BRAND_LOGO = "";
-function loadBrandSettings(){try{var raw=localStorage.getItem("spotBrand");if(!raw)return;var b=JSON.parse(raw);if(b.colors&&b.colors.length)COLORS=b.colors;if(b.typography&&b.typography.length)TYPOGRAPHY=b.typography;if(typeof b.logo==="string")BRAND_LOGO=b.logo;if(b.dos&&b.dos.length)DOS_RULES=b.dos;if(b.donts&&b.donts.length)DONTS_RULES=b.donts;if(b.templates&&b.templates.length)TEMPLATES=b.templates;}catch(e){}}
-function saveBrandSettings(){try{localStorage.setItem("spotBrand",JSON.stringify({colors:COLORS,typography:TYPOGRAPHY,logo:BRAND_LOGO,dos:DOS_RULES,donts:DONTS_RULES,templates:TEMPLATES}));}catch(e){}}
+function loadBrandSettings(){
+  fetch("/api/brand").then(function(r){return r.json();}).then(function(res){
+    var b = res.brand;
+    if (!b) return;
+    if (b.colors && b.colors.length) COLORS = b.colors;
+    if (b.typography && b.typography.length) TYPOGRAPHY = b.typography;
+    if (typeof b.logo === "string") BRAND_LOGO = b.logo;
+    if (b.dos && b.dos.length) DOS_RULES = b.dos;
+    if (b.donts && b.donts.length) DONTS_RULES = b.donts;
+    if (b.templates && b.templates.length) TEMPLATES = b.templates;
+    if (b.name) BRAND_NAME = b.name;
+    if (b.tagline) BRAND_TAGLINE = b.tagline;
+    if (b.location) BRAND_LOCATION = b.location;
+    if (b.tone) BRAND_TONE = b.tone;
+    if (typeof renderBrand === "function") renderBrand();
+  }).catch(function(){});
+}
+function saveBrandSettings(){
+  var payload = {
+    colors:COLORS, typography:TYPOGRAPHY, logo:BRAND_LOGO, dos:DOS_RULES, donts:DONTS_RULES, templates:TEMPLATES,
+    name: (typeof BRAND_NAME!=="undefined"?BRAND_NAME:"spot."),
+    tagline: (typeof BRAND_TAGLINE!=="undefined"?BRAND_TAGLINE:"a creative studio"),
+    location: (typeof BRAND_LOCATION!=="undefined"?BRAND_LOCATION:"Halmstad, Sverige"),
+    tone: (typeof BRAND_TONE!=="undefined"?BRAND_TONE:undefined)
+  };
+  fetch("/api/brand", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload) }).catch(function(){});
+}
 function _dataUrlToBinary(dataUrl){var parts=dataUrl.split(",");var meta=parts[0];var b64=parts[1];var ext="png";var m=/data:image\/(\w+)/.exec(meta);if(m)ext=m[1]==="jpeg"?"jpg":m[1];return {base64:b64,ext:ext};}
 async function downloadBrandFolder(){
   var btn=document.getElementById("brandDownloadBtn");
