@@ -957,7 +957,7 @@ function applyRolePermissions(){
   document.querySelectorAll('button[onclick^="removeMember("]').forEach(function(b){ b.style.display = isAdmin ? '' : 'none'; });
   document.querySelectorAll('.approve-btn, button[onclick^="approvePost("]').forEach(function(b){ b.style.display = isAdmin ? '' : 'none'; });
   document.querySelectorAll('button[onclick^="rejectPost("]').forEach(function(b){ b.style.display = isGranskare ? 'none' : ''; });
-  var nwCard = document.getElementById('newWorkspaceCard'); if (nwCard) nwCard.style.display = (isAdmin && CURRENT_WORKSPACE === 'spot') ? 'block' : 'none';
+  var nwCard = document.getElementById('newWorkspaceCard'); if (nwCard) { var showNw = (isAdmin && CURRENT_WORKSPACE === 'spot'); nwCard.style.display = showNw ? 'block' : 'none'; if (showNw && typeof loadWorkspaceList === 'function') loadWorkspaceList(); }
 }
 _loadUserInfo();
 var _imgLibCache = [];
@@ -3390,6 +3390,38 @@ function openAddMember() {
 
 function closeAddMember() { document.getElementById('addMemberModal').style.display = 'none'; }
 
+function exportMyWorkspace(){
+  fetch('/api/export-workspace').then(function(r){return r.json();}).then(function(data){
+    var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'spot-export-' + data.workspace + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (typeof showToast === 'function') showToast('⬇️ All data nedladdad');
+  }).catch(function(){ if (typeof showToast === 'function') showToast('⚠️ Kunde inte exportera'); });
+}
+function loadWorkspaceList(){
+  var list = document.getElementById('workspaceList');
+  if (!list) return;
+  fetch('/api/admin/workspaces').then(function(r){return r.json();}).then(function(data){
+    var wss = (data.workspaces||[]).filter(function(w){ return w.workspace !== 'spot'; });
+    if (!wss.length) { list.innerHTML = '<div style="font-size:12px;color:#9ca3af">Inga andra arbetsytor ännu.</div>'; return; }
+    list.innerHTML = wss.map(function(w){
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f9fafb;border-radius:8px"><div style="font-size:13px"><b>' + w.workspace + '</b> <span style="color:#9ca3af">(' + w.members + ' medlem(mar))</span></div><button onclick="deleteWorkspace(\'' + w.workspace + '\')" style="font-size:12px;color:#b31e59;background:none;border:1px solid #fecaca;border-radius:6px;padding:4px 10px;cursor:pointer">Radera</button></div>';
+    }).join('');
+  }).catch(function(){});
+}
+function deleteWorkspace(id){
+  if (!confirm('Är du helt säker på att du vill radera arbetsytan "' + id + '" permanent? Detta går INTE att ångra — all data, alla användare, bilder och inlägg raderas.')) return;
+  fetch('/api/admin/delete-workspace', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ workspaceId: id }) })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (res.ok) { if (typeof showToast === 'function') showToast('🗑️ Arbetsytan raderad'); loadWorkspaceList(); }
+      else { if (typeof showToast === 'function') showToast('⚠️ ' + (res.error||'Kunde inte radera')); }
+    })
+    .catch(function(){ if (typeof showToast === 'function') showToast('⚠️ Nätverksfel'); });
+}
 function createWorkspace(){
   var company = (document.getElementById('nwCompany').value||'').trim();
   var firstName = (document.getElementById('nwFirstName').value||'').trim();
