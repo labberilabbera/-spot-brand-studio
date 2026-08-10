@@ -15,6 +15,27 @@ const { Pool } = require('pg')
 let _authPool = null
 function getAuthPool() { if (!_authPool) _authPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }); return _authPool }
 async function ensureAuthTable() { await getAuthPool().query("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT)") }
+async function ensureSessionsTable() { await getAuthPool().query("CREATE TABLE IF NOT EXISTS app_sessions (token TEXT PRIMARY KEY, data JSONB, created_at BIGINT)") }
+function persistSession(token, data) {
+  ensureSessionsTable()
+    .then(function(){ return getAuthPool().query('INSERT INTO app_sessions (token,data,created_at) VALUES ($1,$2,$3) ON CONFLICT (token) DO UPDATE SET data=$2', [token, JSON.stringify(data), Date.now()]) })
+    .catch(function(e){ console.error('[session] persist error:', e.message) })
+}
+function dropSession(token) {
+  ensureSessionsTable()
+    .then(function(){ return getAuthPool().query('DELETE FROM app_sessions WHERE token=$1', [token]) })
+    .catch(function(){})
+}
+async function restoreSessions() {
+  try {
+    await ensureSessionsTable()
+    const cutoff = Date.now() - 1000 * 60 * 60 * 24 * 7
+    await getAuthPool().query('DELETE FROM app_sessions WHERE created_at < $1', [cutoff])
+    const r = await getAuthPool().query('SELECT token, data FROM app_sessions')
+    r.rows.forEach(function(row){ sessions[row.token] = row.data })
+    console.log('[session] restored ' + r.rows.length + ' sessions')
+  } catch (e) { console.error('[session] restore error:', e.message) }
+}
 async function ensureUsersTable() {
   await getAuthPool().query("CREATE TABLE IF NOT EXISTS app_users (username TEXT PRIMARY KEY, password TEXT, role TEXT, first_name TEXT, last_name TEXT)")
   await getAuthPool().query("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email TEXT")
@@ -52,18 +73,20 @@ app.post('/login', async (req, res) => {
   if (u && password === u.password) {
     const t = makeToken()
     sessions[t] = { u: u.username, role: u.role, firstName: u.first_name, lastName: u.last_name, workspace: u.workspace || 'spot' }
+    persistSession(t, sessions[t])
     res.setHeader('Set-Cookie', 'spot_session=' + t + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + (60*60*24*7))
     return res.redirect('/')
   }
   if (username === UNAME && password === await getPassword()) {
     const t = makeToken()
     sessions[t] = { u: username, role: 'admin', firstName: process.env.APP_USER_FIRSTNAME || 'Spot', lastName: process.env.APP_USER_LASTNAME || 'Admin', workspace: 'spot' }
+    persistSession(t, sessions[t])
     res.setHeader('Set-Cookie', 'spot_session=' + t + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + (60*60*24*7))
     return res.redirect('/')
   }
   res.redirect('/login?err=1')
 })
-app.post('/logout', (req, res) => { delete sessions[getToken(req)]; res.setHeader('Set-Cookie', 'spot_session=; Path=/; Max-Age=0'); res.json({ ok: true }) })
+app.post('/logout', (req, res) => { const _t = getToken(req); delete sessions[_t]; dropSession(_t); res.setHeader('Set-Cookie', 'spot_session=; Path=/; Max-Age=0'); res.json({ ok: true }) })
 app.get('/api/me', auth, (req, res) => { const s = sessions[getToken(req)] || {}; const firstName = s.firstName || 'Spot'; const lastName = s.lastName || 'Admin'; const role = s.role || 'admin'; const initials = (firstName[0]||'') + (lastName[0]||''); res.json({ firstName, lastName, role, workspace: s.workspace || 'spot', initials: initials.toUpperCase() }) })
 async function ensureChannelsTable() { await getAuthPool().query("CREATE TABLE IF NOT EXISTS user_channels (username TEXT, platform TEXT, handle TEXT, PRIMARY KEY (username, platform))") }
 app.get('/api/channels', auth, async (req, res) => {
@@ -418,7 +441,7 @@ app.post('/api/admin/delete-workspace', auth, async (req, res) => {
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
-app.listen(PORT, () => console.log('spot. running on ' + PORT))
+restoreSessions().finally(function(){ app.listen(PORT, () => console.log('spot. running on ' + PORT)) })
 const LOGIN_HTML = '<!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"/><title>spot.</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Segoe UI,sans-serif;background:#0f0f0f;min-height:100vh;display:flex;align-items:center;justify-content:center}.c{background:#fff;border-radius:20px;padding:40px 36px;width:min(380px,92vw);box-shadow:0 24px 60px rgba(0,0,0,.4)}.logo{font-size:28px;font-weight:800;color:#b31e59;margin-bottom:4px}.tag{font-size:13px;color:#9ca3af;margin-bottom:32px}.f{margin-bottom:16px}label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px}input{width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:15px;outline:none;font-family:inherit}input:focus{border-color:#b31e59}.err{color:#b31e59;font-size:13px;margin-top:8px;display:none}.err.show{display:block}button{width:100%;margin-top:8px;padding:13px;background:#b31e59;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}</style></head><body><div class="c"><div class="logo">spot.</div><div class="tag">content studio</div><form method="POST" action="/login"><div class="f"><label>Användarnamn</label><input type="text" name="username" autofocus/></div><div class="f"><label>Lösenord</label><input type="password" name="password"/></div><div class="err" id="err">Fel.</div><button type="submit">Logga in</button><div style="text-align:center;margin-top:14px"><a href="/forgot" style="font-size:12px;color:#9ca3af;text-decoration:none">Glömt lösenord?</a></div><div class="ok" id="ok" style="display:none;color:#16a34a;font-size:13px;margin-top:8px;text-align:center">Lösenordet är återställt. Logga in med det nya lösenordet.</div></form></div><script>var q=new URLSearchParams(location.search);if(q.get("err"))document.getElementById("err").classList.add("show");if(q.get("reset"))document.getElementById("ok").style.display="block"<\/script></body></html>'
 
 const FORGOT_HTML = '<!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"/><title>spot. - Glömt lösenord</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Segoe UI,sans-serif;background:#0f0f0f;min-height:100vh;display:flex;align-items:center;justify-content:center}.c{background:#fff;border-radius:20px;padding:40px 36px;width:min(380px,92vw);box-shadow:0 24px 60px rgba(0,0,0,.4)}.logo{font-size:28px;font-weight:800;color:#b31e59;margin-bottom:4px}.tag{font-size:13px;color:#9ca3af;margin-bottom:24px;line-height:1.5}.f{margin-bottom:16px}label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px}input{width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:15px;outline:none;font-family:inherit}input:focus{border-color:#b31e59}.msg{font-size:13px;margin-top:8px;display:none}.msg.err{color:#b31e59}.msg.show{display:block}button{width:100%;margin-top:8px;padding:13px;background:#b31e59;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}a.back{display:block;text-align:center;margin-top:14px;font-size:12px;color:#9ca3af;text-decoration:none}</style></head><body><div class="c"><div class="logo">spot.</div><div class="tag">Ange återställningskoden och välj ett nytt lösenord.</div><form method="POST" action="/forgot"><div class="f"><label>Återställningskod</label><input type="text" name="recoveryCode" autofocus/></div><div class="f"><label>Nytt lösenord</label><input type="password" name="newPassword"/></div><div class="msg err" id="err">Fel kod eller för kort lösenord (minst 4 tecken).</div><div class="msg err" id="nocfg">Ingen återställningskod är konfigurerad. Kontakta admin.</div><button type="submit">Återställ lösenord</button></form><a class="back" href="/login">Tillbaka till inloggning</a></div><script>var q=new URLSearchParams(location.search);var e=q.get("err");if(e==="1")document.getElementById("err").classList.add("show");if(e==="nocfg")document.getElementById("nocfg").classList.add("show")<\/script></body></html>'
