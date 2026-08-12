@@ -725,6 +725,13 @@ textarea.field-input{resize:none;line-height:1.5}
           <div style="border-top:1px solid #f3f4f6;margin-top:8px;padding-top:14px;width:100%">
             <div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px;text-transform:uppercase">Befintliga arbetsytor</div>
             <div id="workspaceList" style="display:flex;flex-direction:column;gap:6px"></div>
+            <div style="font-size:12px;font-weight:600;color:#6b7280;margin:16px 0 8px;text-transform:uppercase">💰 Fakturaunderlag</div>
+            <div style="display:flex;gap:8px;align-items:end;margin-bottom:10px;flex-wrap:wrap">
+              <div><div style="font-size:11px;color:#6b7280;margin-bottom:3px">Pris per användare (kr/mån)</div><input id="bpPricePerUser" type="number" min="0" style="width:120px;padding:7px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px"></div>
+              <div><div style="font-size:11px;color:#6b7280;margin-bottom:3px">Grundavgift (kr/mån)</div><input id="bpBaseFee" type="number" min="0" style="width:120px;padding:7px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px"></div>
+              <button onclick="saveBillingPricing()" style="padding:8px 14px;background:var(--m);color:#fff;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none">Spara priser</button>
+            </div>
+            <div id="billingSummary" style="display:flex;flex-direction:column;gap:6px"></div>
             <div style="font-size:12px;font-weight:600;color:#6b7280;margin:16px 0 8px;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between">📋 Faktureringsändringar <button onclick="markBillingSeen()" style="font-size:11px;font-weight:600;color:#6b7280;background:none;border:1px solid #e5e7eb;border-radius:6px;padding:3px 8px;cursor:pointer">Markera som läst</button></div>
             <div id="billingEvents" style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
           </div>
@@ -958,7 +965,7 @@ function applyRolePermissions(){
   document.querySelectorAll('button[onclick^="removeMember("]').forEach(function(b){ b.style.display = isAdmin ? '' : 'none'; });
   document.querySelectorAll('.approve-btn, button[onclick^="approvePost("]').forEach(function(b){ b.style.display = isAdmin ? '' : 'none'; });
   document.querySelectorAll('button[onclick^="rejectPost("]').forEach(function(b){ b.style.display = isGranskare ? 'none' : ''; });
-  var nwCard = document.getElementById('newWorkspaceCard'); if (nwCard) { var showNw = (isAdmin && CURRENT_WORKSPACE === 'spot'); nwCard.style.display = showNw ? 'block' : 'none'; if (showNw && typeof loadWorkspaceList === 'function') { loadWorkspaceList(); if (typeof loadBillingEvents === 'function') loadBillingEvents(); } }
+  var nwCard = document.getElementById('newWorkspaceCard'); if (nwCard) { var showNw = (isAdmin && CURRENT_WORKSPACE === 'spot'); nwCard.style.display = showNw ? 'block' : 'none'; if (showNw && typeof loadWorkspaceList === 'function') { loadWorkspaceList(); if (typeof loadBillingEvents === 'function') loadBillingEvents(); if (typeof loadBillingSummary === 'function') loadBillingSummary(); } }
 }
 _loadUserInfo();
 var _imgLibCache = [];
@@ -3653,6 +3660,32 @@ function loadWorkspaceList(){
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f9fafb;border-radius:8px"><div style="font-size:13px"><b>' + w.workspace + '</b> <span style="color:#9ca3af">(' + w.members + ' medlem(mar))</span></div><button onclick="deleteWorkspace(\'' + w.workspace + '\')" style="font-size:12px;color:#b31e59;background:none;border:1px solid #fecaca;border-radius:6px;padding:4px 10px;cursor:pointer">Radera</button></div>';
     }).join('');
   }).catch(function(){});
+}
+function loadBillingSummary(){
+  var box = document.getElementById('billingSummary');
+  if (!box) return;
+  fetch('/api/admin/billing-summary').then(function(r){return r.json();}).then(function(data){
+    var rows = data.rows || [];
+    var def = data.defaults || {};
+    var pu = document.getElementById('bpPricePerUser'); if (pu && !pu.value) pu.value = def.pricePerUser;
+    var bf = document.getElementById('bpBaseFee'); if (bf && !bf.value) bf.value = def.baseFee;
+    if (!rows.length) { box.innerHTML = '<div style="font-size:12px;color:#9ca3af">Inga kundarbetsytor att fakturera ännu.</div>'; return; }
+    var grand = rows.reduce(function(a,r){ return a + r.total; }, 0);
+    box.innerHTML = rows.map(function(r){
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#f9fafb;border-radius:8px;font-size:13px"><div><b>' + r.workspace + '</b> <span style="color:#9ca3af">· ' + r.members + ' anv × ' + r.pricePerUser + ' kr' + (r.baseFee ? (' + ' + r.baseFee + ' kr grundavg.') : '') + '</span></div><div style="font-weight:700;color:#b31e59">' + r.total.toLocaleString('sv-SE') + ' kr/mån</div></div>';
+    }).join('') + '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-top:2px solid #f3f4f6;margin-top:4px;font-size:13px"><b>Totalt att fakturera</b><b style="color:#b31e59">' + grand.toLocaleString('sv-SE') + ' kr/mån</b></div>';
+  }).catch(function(){});
+}
+function saveBillingPricing(){
+  var pu = parseFloat(document.getElementById('bpPricePerUser').value) || 0;
+  var bf = parseFloat(document.getElementById('bpBaseFee').value) || 0;
+  fetch('/api/admin/billing-pricing', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ pricePerUser: pu, baseFee: bf }) })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (res.ok) { if (typeof showToast==='function') showToast('💰 Priser sparade'); loadBillingSummary(); }
+      else { if (typeof showToast==='function') showToast('⚠️ ' + (res.error||'Kunde inte spara')); }
+    })
+    .catch(function(){ if (typeof showToast==='function') showToast('⚠️ Nätverksfel'); });
 }
 function loadBillingEvents(){
   var box = document.getElementById('billingEvents');
