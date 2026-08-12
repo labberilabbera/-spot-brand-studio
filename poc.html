@@ -876,6 +876,10 @@ textarea.field-input{resize:none;line-height:1.5}
       <input id="newMemberEmail" placeholder="namn@foretag.se" type="email" style="width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:13px;outline:none;font-family:inherit">
     </div>
     <div style="margin-bottom:12px">
+      <div style="font-size:11px;font-weight:600;color:#6b7280;margin-bottom:4px;text-transform:uppercase">Användarnamn</div>
+      <input id="newMemberUsername" placeholder="t.ex. anna (lämna tomt för automatiskt)" type="text" style="width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:13px;outline:none;font-family:inherit">
+    </div>
+    <div style="margin-bottom:12px">
       <div style="font-size:11px;font-weight:600;color:#6b7280;margin-bottom:4px;text-transform:uppercase">Lösenord</div>
       <input id="newMemberPassword" placeholder="Minst 4 tecken" type="password" style="width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:13px;outline:none;font-family:inherit">
     </div>
@@ -3633,6 +3637,7 @@ function openAddMember() {
   document.getElementById('newMemberName').value = '';
   document.getElementById('newMemberEmail').value = '';
   document.getElementById('newMemberPassword').value = '';
+  var _nu = document.getElementById('newMemberUsername'); if (_nu) _nu.value = '';
   document.getElementById('newMemberRole').value = 'editor';
   document.getElementById('addMemberModal').style.display = 'flex';
 }
@@ -3750,7 +3755,8 @@ function addMember() {
   const role  = document.getElementById('newMemberRole').value;
   if (!name || !email || !password) { showToast('Fyll i namn, e-post och lösenord','err'); return; }
   if (password.length < 4) { showToast('Lösenordet måste vara minst 4 tecken','err'); return; }
-  fetch('/api/team/invite', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name,email,password,role}) })
+  const username = (document.getElementById('newMemberUsername')||{}).value || '';
+  fetch('/api/team/invite', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name,email,password,role,username}) })
     .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, data:d}; }); })
     .then(function(res){
       if (!res.ok) { showToast('⚠️ ' + (res.data.error||'Kunde inte skapa kontot')); return; }
