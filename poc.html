@@ -578,7 +578,6 @@ textarea.field-input{resize:none;line-height:1.5}
               <button class="tag-add-btn" onclick="addManualTag()">+</button>
             </div>
           </div>
-          <button type="button" onclick="openCreateEditor()" style="width:100%;margin-bottom:12px;padding:10px 14px;background:#fff;border:1.5px solid var(--m);color:var(--m);border-radius:9px;font-size:13px;font-weight:600;cursor:pointer">✏️ Redigera i editor (block, bild, m.m.)</button>
           <div style="display:none">
             <div class="field-label">Call-to-Action</div>
             <input class="field-input" id="m-cta" placeholder="t.ex. Besök vår webbplats!" oninput="updateManualPreview()">
@@ -2152,7 +2151,7 @@ function renderProposalCards(ch) {
       const cardLayouts = ['studio','case','louisiana'];
       const mockPost = { channel: ch, layout: cardLayouts[i] || 'gradient', title: p.title||'', content: p.content||'', hashtags: (p.hashtags||[]).map(t=>t.replace(/^#/,'')), cta: p.cta||'', imageUrl: activeImageUrl(), imageStyle: S.imageStyle };
       const dim = i!==selectedIdx;
-      return `<div class="ai-prop-card ${i===selectedIdx?'selected':''}" onclick="openProposalZoom('${ch}',${i})" style="${dim ? 'opacity:.55;filter:grayscale(.3)' : ''};transition:opacity .15s,filter .15s">
+      return `<div class="ai-prop-card ${i===selectedIdx?'selected':''}" onclick="openProposalEditor('${ch}',${i})" style="${dim ? 'opacity:.55;filter:grayscale(.3)' : ''};transition:opacity .15s,filter .15s">
         <div class="ai-prop-thumb" style="position:relative;aspect-ratio:${_arFor(ch)}">
           ${getPostImageHTML(mockPost)}
           ${S._aiImageLoading ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;z-index:5"><div style="width:22px;height:22px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite"></div><div style="font-size:9px;color:#fff;font-weight:600">Skapar bild…</div></div>` : ''}
@@ -3753,6 +3752,10 @@ function copyShareText() {
 // ════════════════════════════════════════════════════════
 let _pzmCh = null, _pzmIdx = 0;
 
+function openProposalEditor(ch, idx) {
+  if (typeof selectProposalCard === 'function') selectProposalCard(ch, idx);
+  setTimeout(function(){ if (typeof openCreateEditor === 'function') openCreateEditor(); }, 60);
+}
 function openProposalZoom(ch, idx) {
   _pzmCh = ch; _pzmIdx = idx;
   document.getElementById('propZoomModal').classList.add('open');
