@@ -3208,7 +3208,8 @@ async function renderPublished() {
     const archived = isArchived(post);
     const exp = expiryInfo(post);
     const archiveBtn = `<button onclick="event.stopPropagation();toggleArchive(${i})" title="${archived?'Återställ':'Arkivera'}"
-      style="font-size:10px;font-weight:600;border:1px solid #e5e7eb;background:#fff;color:#6b7280;border-radius:6px;padding:2px 8px;cursor:pointer">${archived?'📂 Återställ':'🗄️ Arkivera'}</button>`;
+      style="font-size:10px;font-weight:600;border:1px solid #e5e7eb;background:#fff;color:#6b7280;border-radius:6px;padding:2px 8px;cursor:pointer">${archived?'📂 Återställ':'🗄️ Arkivera'}</button><button onclick="event.stopPropagation();deletePublishedPost(${i})" title="Ta bort permanent"
+      style="font-size:10px;font-weight:600;border:1px solid #fecaca;background:#fff;color:#b31e59;border-radius:6px;padding:2px 8px;cursor:pointer;margin-left:4px">🗑️ Ta bort</button>`;
     return `<div class="pub-post-card" onclick="openPubDetail(${i})">
       <div class="pub-post-thumb" style="background:${grad};padding:0;overflow:hidden;position:relative">
         ${getPostImageHTML(post)}
@@ -3231,6 +3232,23 @@ async function renderPublished() {
   }).join('');
 }
 
+function deletePublishedPost(idx){
+  const post = (window._pubPostsCache && window._pubPostsCache[idx]) || null;
+  if (!post) return;
+  if (!confirm('Ta bort "' + (post.title||'inlägget') + '" permanent? Detta går inte att ångra.')) return;
+  const finish = function(){
+    S.publishedPosts = S.publishedPosts.filter(function(p){ return !(p.title===post.title && p.channel===post.channel); });
+    S.reviewQueue = S.reviewQueue.filter(function(p){ return p.id !== post.id; });
+    _saveAppState();
+    renderPublished();
+    if (typeof renderSchema === 'function') renderSchema();
+    if (typeof showToast==='function') showToast('🗑️ Inlägget borttaget');
+  };
+  if (post.id) {
+    fetch('/api/delete-post', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: post.id }) })
+      .then(function(){ finish(); }).catch(function(){ finish(); });
+  } else { finish(); }
+}
 function openPubDetail(idx) {
   const post = (window._pubPostsCache && window._pubPostsCache[idx]) || {};
   window._pubDetailIdx = idx;
@@ -3910,10 +3928,26 @@ function renderSchema() {
         <div class="upcoming-title">${p.title||'(Utan titel)'}</div>
         <div class="upcoming-content">${p.content||''}</div>
       </div>
+      <button onclick="event.stopPropagation();deleteScheduledPost('${p.id}')" title="Ta bort" style="font-size:11px;font-weight:600;border:1px solid #fecaca;background:#fff;color:#b31e59;border-radius:6px;padding:3px 9px;cursor:pointer;flex-shrink:0">🗑️</button>
     </div>`;
   }).join('');
 }
 
+function deleteScheduledPost(id){
+  const all = (typeof getScheduledPosts === 'function') ? getScheduledPosts() : [];
+  const post = all.find(function(x){ return String(x.id) === String(id); });
+  if (!post) return;
+  if (!confirm('Ta bort "' + (post.title||'inlägget') + '" permanent? Detta går inte att ångra.')) return;
+  const finish = function(){
+    S.reviewQueue = S.reviewQueue.filter(function(p){ return String(p.id) !== String(id); });
+    S.publishedPosts = S.publishedPosts.filter(function(p){ return String(p.id) !== String(id); });
+    _saveAppState();
+    renderSchema();
+    if (typeof showToast==='function') showToast('🗑️ Inlägget borttaget');
+  };
+  fetch('/api/delete-post', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: id }) })
+    .then(function(){ finish(); }).catch(function(){ finish(); });
+}
 function calShift(dir) { _calMonthOffset += dir; renderSchema(); }
 function calGoToday() { _calMonthOffset = 0; renderSchema(); }
 
