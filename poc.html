@@ -1180,7 +1180,13 @@ function _withImgBg(post, inner) {
 // Display-serif (matchar SPOT:s Higuen i mallarna) med fallback
 const SERIF = "'Higuen','Higuen Regular',Georgia,'Times New Roman',serif";
 // Bild (uppladdad/AI) eller grå platshållare – fyller en position:relative-container
-function _imgZoomCss(post){ var z = (post && post.imgPos && post.imgPos.zoom) ? post.imgPos.zoom : 1; return z > 1 ? ("transform:scale(" + z + ");transform-origin:center center;") : ""; }
+function _imgTransform(post){
+  var p = (post && post.imgPos) ? post.imgPos : { x:0, y:0, zoom:1 };
+  var z = p.zoom || 1, x = p.x || 0, y = p.y || 0;
+  if (z === 1 && !x && !y) return '';
+  return 'scale(' + z + ') translate(' + (x/z) + '%,' + (y/z) + '%)';
+}
+function _imgZoomCss(post){ var t = _imgTransform(post); return t ? ('transform:' + t + ';transform-origin:center center;') : ''; }
 function _imgOrGray(post) {
   const _imgSrc = post.imageUrl || post.aiImageUrl;
   if (_imgSrc) return `<img src="${_imgSrc}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${_imgObjPos(post)};${_imgZoomCss(post)}filter:${_imgStyleProps(post).f};display:block">`;
@@ -2631,36 +2637,54 @@ function emRenderPreview() {
   card.addEventListener('click', function(ev){ if (ev.target === card || ev.target.tagName === 'IMG') emSelectWidget(null); });
   // Canvas: drag image to pan, wheel to zoom
   var imgEl = card.querySelector('img');
-  if (!imgEl) {
-    // fall back to the card itself when the template paints the photo as a background
-    imgEl = card.firstElementChild || card;
-  }
   if (imgEl) {
-    imgEl.style.cursor = 'grab';
+    card.style.cursor = 'grab';
     var idr = false, isx = 0, isy = 0, sp = null;
-    imgEl.addEventListener('mousedown', function(ev){
-      ev.preventDefault(); idr = true; isx = ev.clientX; isy = ev.clientY;
+    card.addEventListener('mousedown', function(ev){
+      // don't start a pan when grabbing a text widget or its X button
+      var t = ev.target;
+      if (t !== card && t !== imgEl) {
+        if (t.classList && t.classList.contains('em-wx')) return;
+        if (t.getAttribute && t.getAttribute('contenteditable') === 'true') return;
+      }
+      idr = true; isx = ev.clientX; isy = ev.clientY;
       post.imgPos = post.imgPos || { x:0, y:0, zoom:1 };
       sp = { x: post.imgPos.x||0, y: post.imgPos.y||0, zoom: post.imgPos.zoom||1 };
-      imgEl.style.cursor = 'grabbing';
+      card.style.cursor = 'grabbing';
+      ev.preventDefault();
     });
-    window.addEventListener('mousemove', function(ev){
-      if (!idr) return;
-      var z = sp.zoom || 1, mx = z>1 ? (1 - 1/z)*50 : 0;
-      post.imgPos.x = Math.max(-mx, Math.min(mx, sp.x + ((ev.clientX-isx)/card.clientWidth)*100));
-      post.imgPos.y = Math.max(-mx, Math.min(mx, sp.y + ((ev.clientY-isy)/card.clientHeight)*100));
-      imgEl.style.objectPosition = _imgObjPos(post);
-    });
-    window.addEventListener('mouseup', function(){ if (idr) { idr = false; imgEl.style.cursor='grab'; } });
+    if (!window.__emPanBound) {
+      window.__emPanBound = true;
+      window.addEventListener('mousemove', function(ev){
+        var st = window.__emPanState;
+        if (!st || !st.active()) return;
+        st.move(ev);
+      });
+      window.addEventListener('mouseup', function(){
+        var st = window.__emPanState;
+        if (st) st.end();
+      });
+    }
+    window.__emPanState = {
+      active: function(){ return idr; },
+      move: function(ev){
+        var dx = ((ev.clientX - isx) / Math.max(1, card.clientWidth)) * 100;
+        var dy = ((ev.clientY - isy) / Math.max(1, card.clientHeight)) * 100;
+        post.imgPos.x = Math.max(-60, Math.min(60, sp.x + dx));
+        post.imgPos.y = Math.max(-60, Math.min(60, sp.y + dy));
+        imgEl.style.transformOrigin = 'center center';
+        imgEl.style.transform = _imgTransform(post);
+      },
+      end: function(){ if (idr) { idr = false; card.style.cursor = 'grab'; } }
+    };
     imgEl.addEventListener('wheel', function(ev){
       ev.preventDefault();
       post.imgPos = post.imgPos || { x:0, y:0, zoom:1 };
       post.imgPos.zoom = Math.max(1, Math.min(3, (post.imgPos.zoom||1) + (ev.deltaY<0 ? 0.08 : -0.08)));
       var zs = document.getElementById('emZoomSlider'); if (zs) zs.value = post.imgPos.zoom;
       var zl = document.getElementById('emZoomLabel'); if (zl) zl.textContent = Math.round(post.imgPos.zoom*100)+'%';
-      imgEl.style.objectPosition = _imgObjPos(post);
       imgEl.style.transformOrigin = 'center center';
-      imgEl.style.transform = post.imgPos.zoom > 1 ? ('scale(' + post.imgPos.zoom + ')') : '';
+      imgEl.style.transform = _imgTransform(post);
     }, { passive: false });
   }
 }
@@ -2704,9 +2728,8 @@ function emSetZoom(v){
   var card = document.getElementById('emPreviewCard');
   var imgEl = card ? card.querySelector('img') : null;
   if (imgEl) {
-    imgEl.style.objectPosition = _imgObjPos(post);
     imgEl.style.transformOrigin = 'center center';
-    imgEl.style.transform = post.imgPos.zoom > 1 ? ('scale(' + post.imgPos.zoom + ')') : '';
+    imgEl.style.transform = _imgTransform(post);
   }
 }
 
