@@ -2479,6 +2479,12 @@ function openEditorModal(post) {
       </div>
       <button id="emTextUndoBtn" onclick="emUndoText()" style="display:${(S._editTextUndoStack&&S._editTextUndoStack.length)?'inline-flex':'none'};margin-top:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:1.5px solid #e5e7eb;background:#fff;color:#374151;cursor:pointer">↶ Ångra text</button>
     </div>
+    <div style="background:#f9fafb;border:1px solid #f0f0f0;border-radius:10px;padding:12px;margin-bottom:4px">
+      <div class="em-field-label" style="display:flex;align-items:center;justify-content:space-between">🖼️ Text i bilden <button onclick="emResetImgText()" style="font-size:11px;font-weight:600;color:#6b7280;background:none;border:1px solid #e5e7eb;border-radius:6px;padding:3px 8px;cursor:pointer">↺ Samma som inlägget</button></div>
+      <input id="em-img-title" class="em-input" value="${(((post.imgTitle!==undefined&&post.imgTitle!==null)?post.imgTitle:(post.title||''))+'').replace(/"/g,'&quot;')}" placeholder="Rubrik i bilden..." onfocus="emSnapshotText()" oninput="emSyncImgText()" style="margin-bottom:6px">
+      <textarea id="em-img-content" class="em-input em-textarea" rows="3" placeholder="Text i bilden..." onfocus="emSnapshotText()" oninput="emSyncImgText()">${((post.imgContent!==undefined&&post.imgContent!==null)?post.imgContent:(post.content||''))}</textarea>
+      <div style="font-size:11px;color:#9ca3af;margin-top:4px">Påverkar bara texten i bilden — inte inläggstexten ovan.</div>
+    </div>
     <div>
       <div class="em-field-label">🎨 Bild</div>
       <div style="display:flex;gap:6px;margin-bottom:6px">
@@ -2602,11 +2608,33 @@ function emUndoRemoveBlock(){
   openEditorModal(post);
   if (typeof showToast==='function') showToast('↶ Blockändring återställd');
 }
+function emSyncImgText(){
+  const post = S._editPost;
+  if (!post) return;
+  const it = document.getElementById('em-img-title');
+  const ic = document.getElementById('em-img-content');
+  if (it) post.imgTitle = it.value;
+  if (ic) post.imgContent = ic.value;
+  emRenderPreview();
+}
+function emResetImgText(){
+  const post = S._editPost;
+  if (!post) return;
+  emSnapshotText();
+  post.imgTitle = null;
+  post.imgContent = null;
+  const it = document.getElementById('em-img-title');
+  const ic = document.getElementById('em-img-content');
+  if (it) it.value = post.title || '';
+  if (ic) ic.value = post.content || '';
+  emRenderPreview();
+  if (typeof showToast==='function') showToast('↺ Bildtexten följer inlägget igen');
+}
 function emSnapshotText(){
   const post = S._editPost;
   if (!post) return;
   S._editTextUndoStack = S._editTextUndoStack || [];
-  S._editTextUndoStack.push({ title: post.title, content: post.content, hashtags: [...(post.hashtags||[])] });
+  S._editTextUndoStack.push({ title: post.title, content: post.content, hashtags: [...(post.hashtags||[])], imgTitle: post.imgTitle, imgContent: post.imgContent });
   const tb = document.getElementById('emTextUndoBtn'); if (tb) tb.style.display = 'inline-flex';
 }
 function emUndoText(){
@@ -2616,7 +2644,11 @@ function emUndoText(){
   post.title = last.title;
   post.content = last.content;
   post.hashtags = last.hashtags;
+  post.imgTitle = last.imgTitle;
+  post.imgContent = last.imgContent;
   if (typeof emSyncToForm === 'function') { emSyncToForm('title', post.title||''); emSyncToForm('content', post.content||''); }
+  var _it = document.getElementById('em-img-title'); if (_it) _it.value = (post.imgTitle!==undefined&&post.imgTitle!==null) ? post.imgTitle : (post.title||'');
+  var _ic = document.getElementById('em-img-content'); if (_ic) _ic.value = (post.imgContent!==undefined&&post.imgContent!==null) ? post.imgContent : (post.content||'');
   const container = document.getElementById('em-tags');
   if (container) container.innerHTML = (post.hashtags||[]).map(function(t){ return '<span class="tag-edit">#' + t.replace(/^#/,'') + '<span class="tag-rm" onclick="emRmTag(\'' + t.replace(/^#/,'') + '\')">✕</span></span>'; }).join('');
   if (!S._editTextUndoStack.length) { const tb = document.getElementById('emTextUndoBtn'); if (tb) tb.style.display = 'none'; }
