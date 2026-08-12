@@ -120,7 +120,7 @@ app.post('/api/team/invite', auth, async (req, res) => {
   const s = sessions[getToken(req)] || {}
   if ((s.role || 'admin') !== 'admin') return res.status(403).json({ error: 'Endast admin kan bjuda in medlemmar' })
   try {
-    const { name, email, password, role } = req.body || {}
+    const { name, email, password, role, username: wantedUsername } = req.body || {}
     if (!name || !email || !password) return res.status(400).json({ error: 'Namn, e-post och lösenord krävs' })
     if (String(password).length < 4) return res.status(400).json({ error: 'Lösenordet måste vara minst 4 tecken' })
     const roleMap = { admin: 'admin', editor: 'redaktor', viewer: 'granskare' }
@@ -128,7 +128,12 @@ app.post('/api/team/invite', auth, async (req, res) => {
     const parts = String(name).trim().split(/\s+/)
     const firstName = parts[0] || name
     const lastName = parts.slice(1).join(' ') || ''
-    let username = String(email).split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '')
+    let username = String(wantedUsername || String(email).split('@')[0]).toLowerCase().replace(/[^a-z0-9]/g, '')
+    if (!username) username = String(email).split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '')
+    if (wantedUsername) {
+      const taken = await getAuthPool().query('SELECT 1 FROM app_users WHERE username=$1', [username])
+      if (taken.rows.length) return res.status(400).json({ error: 'Användarnamnet är upptaget' })
+    }
     await ensureUsersTable()
     let candidate = username, n = 1
     while ((await getAuthPool().query('SELECT 1 FROM app_users WHERE username=$1', [candidate])).rows.length) {
@@ -451,6 +456,47 @@ app.post('/api/delete-post', auth, async (req, res) => {
     const { Pool } = require('pg')
     const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
     await pool.query("DELETE FROM posts WHERE id=$1 AND data->>'workspace' = $2", [String(id), s.workspace || 'spot'])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+async function ensurePricingTable() {
+  await getAuthPool().query("CREATE TABLE IF NOT EXISTS billing_pricing (workspace TEXT PRIMARY KEY, price_per_user NUMERIC, base_fee NUMERIC, currency TEXT)")
+}
+const DEFAULT_PRICE_PER_USER = 199
+const DEFAULT_BASE_FEE = 0
+app.get('/api/admin/billing-summary', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    if ((s.workspace || 'spot') !== 'spot' || s.role !== 'admin') return res.status(403).json({ error: 'Endast spot-admin' })
+    await ensureUsersTable(); await ensurePricingTable()
+    const counts = await getAuthPool().query("SELECT workspace, COUNT(*) AS members FROM app_users GROUP BY workspace ORDER BY workspace")
+    const pricing = await getAuthPool().query('SELECT workspace, price_per_user, base_fee, currency FROM billing_pricing')
+    const pmap = {}
+    pricing.rows.forEach(function(r){ pmap[r.workspace] = r })
+    const defRow = pmap['__default__'] || {}
+    const defPrice = defRow.price_per_user !== undefined && defRow.price_per_user !== null ? Number(defRow.price_per_user) : DEFAULT_PRICE_PER_USER
+    const defBase = defRow.base_fee !== undefined && defRow.base_fee !== null ? Number(defRow.base_fee) : DEFAULT_BASE_FEE
+    const rows = counts.rows.filter(function(c){ return c.workspace !== 'spot' }).map(function(c){
+      const p = pmap[c.workspace] || {}
+      const pricePerUser = p.price_per_user !== undefined && p.price_per_user !== null ? Number(p.price_per_user) : defPrice
+      const baseFee = p.base_fee !== undefined && p.base_fee !== null ? Number(p.base_fee) : defBase
+      const members = parseInt(c.members, 10)
+      return { workspace: c.workspace, members: members, pricePerUser: pricePerUser, baseFee: baseFee, currency: p.currency || 'SEK', total: baseFee + members * pricePerUser }
+    })
+    res.json({ rows, defaults: { pricePerUser: defPrice, baseFee: defBase } })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.post('/api/admin/billing-pricing', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    if ((s.workspace || 'spot') !== 'spot' || s.role !== 'admin') return res.status(403).json({ error: 'Endast spot-admin' })
+    const { workspace, pricePerUser, baseFee } = req.body || {}
+    const target = workspace || '__default__'
+    await ensurePricingTable()
+    await getAuthPool().query(
+      "INSERT INTO billing_pricing (workspace,price_per_user,base_fee,currency) VALUES ($1,$2,$3,'SEK') ON CONFLICT (workspace) DO UPDATE SET price_per_user=$2, base_fee=$3",
+      [target, Number(pricePerUser) || 0, Number(baseFee) || 0]
+    )
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
