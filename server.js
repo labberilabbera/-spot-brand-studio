@@ -443,6 +443,17 @@ app.post('/api/admin/delete-workspace', auth, async (req, res) => {
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
+app.post('/api/delete-post', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    const { id } = req.body || {}
+    if (!id) return res.status(400).json({ error: 'id saknas' })
+    const { Pool } = require('pg')
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
+    await pool.query("DELETE FROM posts WHERE id=$1 AND data->>'workspace' = $2", [String(id), s.workspace || 'spot'])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
 async function ensureBillingTable() { await getAuthPool().query("CREATE TABLE IF NOT EXISTS billing_events (id SERIAL PRIMARY KEY, workspace TEXT, event_type TEXT, details JSONB, ts BIGINT, seen BOOLEAN DEFAULT FALSE)") }
 function logBillingEvent(workspace, eventType, details) {
   ensureBillingTable()
