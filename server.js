@@ -136,6 +136,7 @@ app.post('/api/team/invite', auth, async (req, res) => {
     }
     username = candidate
     await getAuthPool().query('INSERT INTO app_users (username,password,role,first_name,last_name,email,workspace) VALUES ($1,$2,$3,$4,$5,$6,$7)', [username, password, dbRole, firstName, lastName, email, s.workspace || 'spot'])
+    logBillingEvent(s.workspace || 'spot', 'member_added', { username, name: (firstName + ' ' + lastName).trim(), role: dbRole, addedBy: s.u })
     res.json({ ok: true, username })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -167,6 +168,7 @@ app.post('/api/team/remove', auth, async (req, res) => {
     if (!username) return res.status(400).json({ error: 'username saknas' })
     await ensureUsersTable()
     await getAuthPool().query('DELETE FROM app_users WHERE username=$1', [username])
+    logBillingEvent(s.workspace || 'spot', 'member_removed', { username, removedBy: s.u })
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -438,6 +440,31 @@ app.post('/api/admin/delete-workspace', auth, async (req, res) => {
       await pgPool.query("DELETE FROM posts WHERE data->>'workspace' = $1", [workspaceId])
     } catch (e) {}
     await getAuthPool().query('DELETE FROM app_users WHERE workspace=$1', [workspaceId])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+async function ensureBillingTable() { await getAuthPool().query("CREATE TABLE IF NOT EXISTS billing_events (id SERIAL PRIMARY KEY, workspace TEXT, event_type TEXT, details JSONB, ts BIGINT, seen BOOLEAN DEFAULT FALSE)") }
+function logBillingEvent(workspace, eventType, details) {
+  ensureBillingTable()
+    .then(function(){ return getAuthPool().query('INSERT INTO billing_events (workspace,event_type,details,ts) VALUES ($1,$2,$3,$4)', [workspace, eventType, JSON.stringify(details||{}), Date.now()]) })
+    .catch(function(e){ console.error('[billing] log error:', e.message) })
+}
+app.get('/api/admin/billing-events', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    if ((s.workspace || 'spot') !== 'spot' || s.role !== 'admin') return res.status(403).json({ error: 'Endast spot-admin' })
+    await ensureBillingTable()
+    const r = await getAuthPool().query('SELECT id, workspace, event_type, details, ts, seen FROM billing_events ORDER BY ts DESC LIMIT 100')
+    const counts = await getAuthPool().query("SELECT workspace, COUNT(*) FILTER (WHERE role IS NOT NULL) AS members FROM app_users GROUP BY workspace")
+    res.json({ events: r.rows, memberCounts: counts.rows })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+app.post('/api/admin/billing-events/seen', auth, async (req, res) => {
+  try {
+    const s = sessions[getToken(req)] || {}
+    if ((s.workspace || 'spot') !== 'spot' || s.role !== 'admin') return res.status(403).json({ error: 'Endast spot-admin' })
+    await ensureBillingTable()
+    await getAuthPool().query('UPDATE billing_events SET seen=TRUE WHERE seen=FALSE')
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
