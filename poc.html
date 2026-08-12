@@ -726,6 +726,8 @@ textarea.field-input{resize:none;line-height:1.5}
           <div style="border-top:1px solid #f3f4f6;margin-top:8px;padding-top:14px;width:100%">
             <div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px;text-transform:uppercase">Befintliga arbetsytor</div>
             <div id="workspaceList" style="display:flex;flex-direction:column;gap:6px"></div>
+            <div style="font-size:12px;font-weight:600;color:#6b7280;margin:16px 0 8px;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between">📋 Faktureringsändringar <button onclick="markBillingSeen()" style="font-size:11px;font-weight:600;color:#6b7280;background:none;border:1px solid #e5e7eb;border-radius:6px;padding:3px 8px;cursor:pointer">Markera som läst</button></div>
+            <div id="billingEvents" style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
           </div>
         </div>
       </div>
@@ -957,7 +959,7 @@ function applyRolePermissions(){
   document.querySelectorAll('button[onclick^="removeMember("]').forEach(function(b){ b.style.display = isAdmin ? '' : 'none'; });
   document.querySelectorAll('.approve-btn, button[onclick^="approvePost("]').forEach(function(b){ b.style.display = isAdmin ? '' : 'none'; });
   document.querySelectorAll('button[onclick^="rejectPost("]').forEach(function(b){ b.style.display = isGranskare ? 'none' : ''; });
-  var nwCard = document.getElementById('newWorkspaceCard'); if (nwCard) { var showNw = (isAdmin && CURRENT_WORKSPACE === 'spot'); nwCard.style.display = showNw ? 'block' : 'none'; if (showNw && typeof loadWorkspaceList === 'function') loadWorkspaceList(); }
+  var nwCard = document.getElementById('newWorkspaceCard'); if (nwCard) { var showNw = (isAdmin && CURRENT_WORKSPACE === 'spot'); nwCard.style.display = showNw ? 'block' : 'none'; if (showNw && typeof loadWorkspaceList === 'function') { loadWorkspaceList(); if (typeof loadBillingEvents === 'function') loadBillingEvents(); } }
 }
 _loadUserInfo();
 var _imgLibCache = [];
@@ -3411,6 +3413,29 @@ function loadWorkspaceList(){
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f9fafb;border-radius:8px"><div style="font-size:13px"><b>' + w.workspace + '</b> <span style="color:#9ca3af">(' + w.members + ' medlem(mar))</span></div><button onclick="deleteWorkspace(\'' + w.workspace + '\')" style="font-size:12px;color:#b31e59;background:none;border:1px solid #fecaca;border-radius:6px;padding:4px 10px;cursor:pointer">Radera</button></div>';
     }).join('');
   }).catch(function(){});
+}
+function loadBillingEvents(){
+  var box = document.getElementById('billingEvents');
+  if (!box) return;
+  fetch('/api/admin/billing-events').then(function(r){return r.json();}).then(function(data){
+    var evs = data.events || [];
+    var counts = {};
+    (data.memberCounts||[]).forEach(function(c){ counts[c.workspace] = c.members; });
+    if (!evs.length) { box.innerHTML = '<div style="font-size:12px;color:#9ca3af">Inga ändringar registrerade ännu.</div>'; return; }
+    box.innerHTML = evs.map(function(e){
+      var dt = new Date(Number(e.ts));
+      var when = dt.toLocaleDateString('sv-SE') + ' ' + dt.toLocaleTimeString('sv-SE').slice(0,5);
+      var det = e.details || {};
+      var isAdd = e.event_type === 'member_added';
+      var label = isAdd ? ('➕ <b>' + (det.name || det.username || '') + '</b> lades till') : ('➖ <b>' + (det.username || '') + '</b> togs bort');
+      var total = counts[e.workspace] !== undefined ? (' · nu ' + counts[e.workspace] + ' användare') : '';
+      var unseenStyle = e.seen ? '' : 'border-left:3px solid #b31e59;';
+      return '<div style="padding:8px 12px;background:#f9fafb;border-radius:8px;font-size:12px;' + unseenStyle + '"><div>' + label + ' i <b>' + e.workspace + '</b>' + total + '</div><div style="color:#9ca3af;font-size:11px;margin-top:2px">' + when + (det.addedBy ? (' · av ' + det.addedBy) : (det.removedBy ? (' · av ' + det.removedBy) : '')) + '</div></div>';
+    }).join('');
+  }).catch(function(){});
+}
+function markBillingSeen(){
+  fetch('/api/admin/billing-events/seen', {method:'POST'}).then(function(){ loadBillingEvents(); if (typeof showToast==='function') showToast('✓ Markerade som lästa'); }).catch(function(){});
 }
 function deleteWorkspace(id){
   if (!confirm('Är du helt säker på att du vill radera arbetsytan "' + id + '" permanent? Detta går INTE att ångra — all data, alla användare, bilder och inlägg raderas.')) return;
