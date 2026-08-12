@@ -2550,9 +2550,25 @@ function emRenderPreview() {
   card.innerHTML = getPostImageHTML(post);
   post.textPos = post.textPos || {};
   post.textScale = post.textScale || {};
-  const h1 = card.querySelector('h1');
-  const p  = card.querySelectorAll('p')[0];
-  const tagsEl = card.querySelector('.pi-tags, [class*="tag"]');
+  // Find widgets by matching their rendered text against the post data (templates use plain divs)
+  function _findLeaf(txt){
+    if (!txt) return null;
+    var want = String(txt).replace(/\s+/g,' ').trim();
+    if (!want) return null;
+    var best = null;
+    card.querySelectorAll('div,h1,h2,h3,p,span').forEach(function(el){
+      if (el.children.length) return;
+      var got = (el.innerText||'').replace(/\s+/g,' ').trim();
+      if (got && got === want) best = el;
+    });
+    return best;
+  }
+  var _imgT = (post.imgTitle !== undefined && post.imgTitle !== null) ? post.imgTitle : (post.title||'');
+  var _imgC = (post.imgContent !== undefined && post.imgContent !== null) ? post.imgContent : (post.content||'');
+  var _tagStr = (post.hashtags||[]).slice(0,3).map(function(h){ return '#'+String(h).replace(/^#/,''); }).join(' ');
+  const h1 = _findLeaf(_imgT);
+  const p  = _findLeaf(_imgC);
+  const tagsEl = _findLeaf(_tagStr);
   const widgets = [ ['title', h1], ['content', p], ['hashtags', tagsEl] ];
   widgets.forEach(function(pair){
     var key = pair[0], node = pair[1];
@@ -2614,6 +2630,10 @@ function emRenderPreview() {
   card.addEventListener('click', function(ev){ if (ev.target === card || ev.target.tagName === 'IMG') emSelectWidget(null); });
   // Canvas: drag image to pan, wheel to zoom
   var imgEl = card.querySelector('img');
+  if (!imgEl) {
+    // fall back to the card itself when the template paints the photo as a background
+    imgEl = card.firstElementChild || card;
+  }
   if (imgEl) {
     imgEl.style.cursor = 'grab';
     var idr = false, isx = 0, isy = 0, sp = null;
