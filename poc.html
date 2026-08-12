@@ -1443,7 +1443,7 @@ function checkCompliance(post) {
   const emojiCount = ((post.content || '').match(/\p{Emoji_Presentation}|\p{Extended_Pictographic}/gu) || []).length;
   if (emojiCount > 2) issues.push(`För många emojis (${emojiCount}/2)`);
   if ((post.hashtags || []).length > 5) issues.push(`För många hashtags (${post.hashtags.length}/5)`);
-  if (!post.cta || !post.cta.trim()) issues.push('Saknar Call-to-Action');
+  
   if ((post.hashtags || []).length === 0) warnings.push('Inga hashtags');
   return { issues, warnings, isValid: issues.length === 0 };
 }
@@ -1682,7 +1682,7 @@ function renderPropCards() {
       </div>
       <div class="prop-content">${p.content}</div>
       <div class="prop-tags">${p.hashtags.map(t => `<span class="prop-tag">#${t.replace(/^#/, '')}</span>`).join('')}</div>
-      <div class="prop-cta">› <span style="font-weight:500;color:#374151">${p.cta}</span></div>
+      
     </div>`).join('');
   document.getElementById('addReviewBtn').style.display = S.selectedPerChannel[ch] !== undefined ? 'flex' : 'none';
 }
@@ -2396,7 +2396,7 @@ function renderDetailPanel() {
         </div>
         <div><div class="dp-section-label">Innehåll</div><div class="dp-textbox">${post.content}</div></div>
         <div><div class="dp-section-label"># Hashtags</div><div class="dp-tags">${post.hashtags.map(t=>`<span class="dp-tag">#${t.replace(/^#/,'')}</span>`).join('')}</div></div>
-        <div><div class="dp-section-label">› CTA</div><div class="dp-cta-box">${post.cta}</div></div>
+        
         <div><div class="dp-section-label">Regelkontroll</div>${compHTML}</div>
       </div>
       <div style="padding:10px 14px;border-top:1px solid #f3f4f6;background:#fafafa">
@@ -2484,8 +2484,23 @@ function openEditorModal(post) {
       <textarea id="em-img-content" class="em-input em-textarea" rows="3" placeholder="Text i bilden..." onfocus="emSnapshotText()" oninput="emSyncImgText()">${((post.imgContent!==undefined&&post.imgContent!==null)?post.imgContent:(post.content||''))}</textarea>
       <div style="font-size:11px;color:#9ca3af;margin-top:4px">Påverkar bara texten i bilden — inte inläggstexten ovan.</div>
     </div>
+    <div id="emWidgetPanel" style="display:none;background:#fff7fa;border:1.5px solid #f3d3de;border-radius:10px;padding:12px;margin-bottom:10px">
+      <div class="em-field-label" style="display:flex;align-items:center;justify-content:space-between">✏️ Vald: <span id="emWidgetLabel" style="color:var(--m)"></span> <button onclick="emResetWidgetPos()" style="font-size:11px;font-weight:600;color:#6b7280;background:none;border:1px solid #e5e7eb;border-radius:6px;padding:3px 8px;cursor:pointer">↺ Återställ</button></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+        <span style="font-size:11px;color:#6b7280;font-weight:600;white-space:nowrap">Textstorlek</span>
+        <input type="range" id="emTextSize" min="0.5" max="2.5" step="0.05" value="1" oninput="emSetTextSize(this.value)" style="flex:1">
+        <span id="emTextSizeLabel" style="font-size:11px;color:#6b7280;min-width:38px;text-align:right">100%</span>
+      </div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:4px">Dra widgeten i bilden för att flytta den · ✕ tar bort den</div>
+    </div>
     <div>
       <div class="em-field-label">🎨 Bild</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:11px;color:#6b7280;font-weight:600;white-space:nowrap">Bildzoom</span>
+        <input type="range" id="emZoomSlider" min="1" max="3" step="0.05" value="${(post.imgPos&&post.imgPos.zoom)||1}" oninput="emSetZoom(this.value)" style="flex:1">
+        <span id="emZoomLabel" style="font-size:11px;color:#6b7280;min-width:38px;text-align:right">${Math.round((((post.imgPos&&post.imgPos.zoom)||1))*100)}%</span>
+      </div>
+      <div style="font-size:11px;color:#9ca3af;margin-bottom:8px">Dra i bilden för att flytta motivet · scrolla för att zooma</div>
       <div style="display:flex;gap:6px;margin-bottom:6px">
         <input id="em-img-reprompt" class="em-input" style="flex:1" placeholder="Beskriv en ändring av bilden...">
         <button onclick="emRepromptImage()" style="padding:8px 12px;background:var(--m);color:#fff;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;border:none;white-space:nowrap">Ny bild</button>
@@ -2533,13 +2548,139 @@ function emRenderPreview() {
   card.style.position = 'relative';
   // Render the post card with contenteditable regions
   card.innerHTML = getPostImageHTML(post);
-  // Make title, content, cta directly editable
+  post.textPos = post.textPos || {};
+  post.textScale = post.textScale || {};
   const h1 = card.querySelector('h1');
-  const p  = card.querySelectorAll('p')[0]; // first <p> is content
-  const cta = card.querySelector('.pi-cta, .pi-btn, [class*="cta"]');
-  if (h1)  { h1.contentEditable  = 'true'; h1.addEventListener('input',  () => { post.title   = h1.innerText;   emSyncToForm('title',  h1.innerText); }); }
-  if (p)   { p.contentEditable   = 'true'; p.addEventListener('input',   () => { post.content = p.innerText;    emSyncToForm('content',p.innerText); }); }
-  if (cta) { cta.contentEditable = 'true'; cta.addEventListener('input', () => { post.cta     = cta.innerText; emSyncToForm('cta',    cta.innerText); }); }
+  const p  = card.querySelectorAll('p')[0];
+  const tagsEl = card.querySelector('.pi-tags, [class*="tag"]');
+  const widgets = [ ['title', h1], ['content', p], ['hashtags', tagsEl] ];
+  widgets.forEach(function(pair){
+    var key = pair[0], node = pair[1];
+    if (!node || !(post.blocks||[]).includes(key)) return;
+    var pos = post.textPos[key] || { x:0, y:0 };
+    var scale = post.textScale[key] || 1;
+    node.style.position = 'relative';
+    node.style.transform = 'translate(' + pos.x + 'px,' + pos.y + 'px)';
+    node.style.transformOrigin = 'left top';
+    node.style.fontSize = (scale === 1) ? '' : (scale * 100) + '%';
+    node.style.outlineOffset = '3px';
+    node.style.cursor = 'move';
+    if (key !== 'hashtags') {
+      node.contentEditable = 'true';
+      node.addEventListener('focus', function(){ if (typeof emSnapshotText==='function') emSnapshotText(); });
+      node.addEventListener('input', function(){
+        if (key === 'title') { post.imgTitle = node.innerText; var f1=document.getElementById('em-img-title'); if(f1) f1.value = node.innerText; }
+        else { post.imgContent = node.innerText; var f2=document.getElementById('em-img-content'); if(f2) f2.value = node.innerText; }
+      });
+    }
+    node.addEventListener('mouseenter', function(){ if (_emActiveWidget !== key) node.style.outline = '1px dashed rgba(255,255,255,.6)'; });
+    node.addEventListener('mouseleave', function(){ if (_emActiveWidget !== key) node.style.outline = 'none'; });
+    node.addEventListener('click', function(ev){ ev.stopPropagation(); emSelectWidget(key); });
+    // Drag to move (hold and drag anywhere on the widget)
+    var dragging = false, sx = 0, sy = 0, startX = 0, startY = 0, moved = false;
+    node.addEventListener('mousedown', function(ev){
+      if (ev.target.classList && ev.target.classList.contains('em-wx')) return;
+      dragging = true; moved = false;
+      sx = ev.clientX; sy = ev.clientY;
+      var cur = post.textPos[key] || { x:0, y:0 };
+      startX = cur.x; startY = cur.y;
+    });
+    window.addEventListener('mousemove', function(ev){
+      if (!dragging) return;
+      var dx = ev.clientX - sx, dy = ev.clientY - sy;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) { moved = true; node.contentEditable = 'false'; }
+      if (!moved) return;
+      ev.preventDefault();
+      post.textPos[key] = { x: startX + dx, y: startY + dy };
+      node.style.transform = 'translate(' + (startX+dx) + 'px,' + (startY+dy) + 'px)';
+    });
+    window.addEventListener('mouseup', function(){
+      if (!dragging) return;
+      dragging = false;
+      if (moved && key !== 'hashtags') setTimeout(function(){ node.contentEditable = 'true'; }, 0);
+    });
+    // X button
+    var x = document.createElement('button');
+    x.className = 'em-wx';
+    x.textContent = '\u2715';
+    x.title = 'Ta bort';
+    x.contentEditable = 'false';
+    x.style.cssText = 'position:absolute;top:-10px;right:-10px;width:20px;height:20px;border-radius:50%;background:#b31e59;color:#fff;border:2px solid #fff;font-size:11px;line-height:1;cursor:pointer;z-index:30;padding:0;display:none;align-items:center;justify-content:center';
+    x.addEventListener('mousedown', function(ev){ ev.preventDefault(); ev.stopPropagation(); });
+    x.addEventListener('click', function(ev){ ev.preventDefault(); ev.stopPropagation(); if (typeof emRemoveBlock==='function') emRemoveBlock(key); });
+    node.appendChild(x);
+    if (_emActiveWidget === key) { node.style.outline = '2px solid #b31e59'; x.style.display = 'flex'; }
+  });
+  card.addEventListener('click', function(ev){ if (ev.target === card || ev.target.tagName === 'IMG') emSelectWidget(null); });
+  // Canvas: drag image to pan, wheel to zoom
+  var imgEl = card.querySelector('img');
+  if (imgEl) {
+    imgEl.style.cursor = 'grab';
+    var idr = false, isx = 0, isy = 0, sp = null;
+    imgEl.addEventListener('mousedown', function(ev){
+      ev.preventDefault(); idr = true; isx = ev.clientX; isy = ev.clientY;
+      post.imgPos = post.imgPos || { x:0, y:0, zoom:1 };
+      sp = { x: post.imgPos.x||0, y: post.imgPos.y||0, zoom: post.imgPos.zoom||1 };
+      imgEl.style.cursor = 'grabbing';
+    });
+    window.addEventListener('mousemove', function(ev){
+      if (!idr) return;
+      var z = sp.zoom || 1, mx = z>1 ? (1 - 1/z)*50 : 0;
+      post.imgPos.x = Math.max(-mx, Math.min(mx, sp.x + ((ev.clientX-isx)/card.clientWidth)*100));
+      post.imgPos.y = Math.max(-mx, Math.min(mx, sp.y + ((ev.clientY-isy)/card.clientHeight)*100));
+      imgEl.style.objectPosition = _imgObjPos(post);
+    });
+    window.addEventListener('mouseup', function(){ if (idr) { idr = false; imgEl.style.cursor='grab'; } });
+    imgEl.addEventListener('wheel', function(ev){
+      ev.preventDefault();
+      post.imgPos = post.imgPos || { x:0, y:0, zoom:1 };
+      post.imgPos.zoom = Math.max(1, Math.min(3, (post.imgPos.zoom||1) + (ev.deltaY<0 ? 0.08 : -0.08)));
+      var zs = document.getElementById('emZoomSlider'); if (zs) zs.value = post.imgPos.zoom;
+      var zl = document.getElementById('emZoomLabel'); if (zl) zl.textContent = Math.round(post.imgPos.zoom*100)+'%';
+      imgEl.style.objectPosition = _imgObjPos(post);
+    }, { passive: false });
+  }
+}
+var _emActiveWidget = null;
+function emSelectWidget(key){
+  _emActiveWidget = key;
+  var panel = document.getElementById('emWidgetPanel');
+  if (panel) panel.style.display = key ? 'block' : 'none';
+  var lbl = document.getElementById('emWidgetLabel');
+  var names = { title:'Rubrik', content:'Text', hashtags:'Hashtags' };
+  if (lbl && key) lbl.textContent = names[key] || key;
+  var post = S._editPost;
+  var sl = document.getElementById('emTextSize');
+  if (sl && key && post) { sl.value = (post.textScale && post.textScale[key]) || 1; var sv=document.getElementById('emTextSizeLabel'); if(sv) sv.textContent = Math.round(sl.value*100)+'%'; }
+  emRenderPreview();
+}
+function emSetTextSize(v){
+  var post = S._editPost;
+  if (!post || !_emActiveWidget) return;
+  post.textScale = post.textScale || {};
+  post.textScale[_emActiveWidget] = parseFloat(v) || 1;
+  var sv = document.getElementById('emTextSizeLabel'); if (sv) sv.textContent = Math.round(v*100)+'%';
+  emRenderPreview();
+}
+function emResetWidgetPos(){
+  var post = S._editPost;
+  if (!post || !_emActiveWidget) return;
+  post.textPos = post.textPos || {}; post.textScale = post.textScale || {};
+  post.textPos[_emActiveWidget] = { x:0, y:0 };
+  post.textScale[_emActiveWidget] = 1;
+  var sl = document.getElementById('emTextSize'); if (sl) sl.value = 1;
+  var sv = document.getElementById('emTextSizeLabel'); if (sv) sv.textContent = '100%';
+  emRenderPreview();
+}
+function emSetZoom(v){
+  const post = S._editPost;
+  if (!post) return;
+  post.imgPos = post.imgPos || { x:0, y:0, zoom:1 };
+  post.imgPos.zoom = parseFloat(v) || 1;
+  var zl = document.getElementById('emZoomLabel'); if (zl) zl.textContent = Math.round(post.imgPos.zoom*100)+'%';
+  var card = document.getElementById('emPreviewCard');
+  var imgEl = card ? card.querySelector('img') : null;
+  if (imgEl) imgEl.style.objectPosition = _imgObjPos(post);
 }
 
 function emSyncFromForm() {
@@ -3313,7 +3454,7 @@ function openPubDetail(idx) {
       <div style="font-size:13px;color:#374151;line-height:1.6;white-space:pre-wrap">${post.content||''}</div>
     </div>
     ${tags ? `<div><div style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;margin-bottom:6px">Hashtags</div><div>${tags}</div></div>` : ''}
-    ${post.cta ? `<div style="background:var(--m);color:#fff;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:600;text-align:center">${post.cta}</div>` : ''}
+    
     <div style="border-top:1px solid #f3f4f6;padding-top:16px">
       <div style="font-size:11px;color:#9ca3af;margin-bottom:10px">Vill du återanvända det här inlägget? Öppna det i editorn, justera text och år – det sparas som ett nytt utkast i Granskning.</div>
       <button onclick="reusePost(${idx})" style="width:100%;padding:12px;border-radius:10px;background:linear-gradient(135deg,#b31e59,#82093e);color:#fff;font-size:14px;font-weight:600;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:8px">
