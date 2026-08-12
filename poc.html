@@ -1180,9 +1180,10 @@ function _withImgBg(post, inner) {
 // Display-serif (matchar SPOT:s Higuen i mallarna) med fallback
 const SERIF = "'Higuen','Higuen Regular',Georgia,'Times New Roman',serif";
 // Bild (uppladdad/AI) eller grå platshållare – fyller en position:relative-container
+function _imgZoomCss(post){ var z = (post && post.imgPos && post.imgPos.zoom) ? post.imgPos.zoom : 1; return z > 1 ? ("transform:scale(" + z + ");transform-origin:center center;") : ""; }
 function _imgOrGray(post) {
   const _imgSrc = post.imageUrl || post.aiImageUrl;
-  if (_imgSrc) return `<img src="${_imgSrc}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${_imgObjPos(post)};filter:${_imgStyleProps(post).f};display:block">`;
+  if (_imgSrc) return `<img src="${_imgSrc}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${_imgObjPos(post)};${_imgZoomCss(post)}filter:${_imgStyleProps(post).f};display:block">`;
   return `<div style="position:absolute;inset:0;background:linear-gradient(160deg,#c4c4c4 0%,#8a8a8a 55%,#5e5e5e 100%)"></div>`;
 }
 
@@ -2658,6 +2659,8 @@ function emRenderPreview() {
       var zs = document.getElementById('emZoomSlider'); if (zs) zs.value = post.imgPos.zoom;
       var zl = document.getElementById('emZoomLabel'); if (zl) zl.textContent = Math.round(post.imgPos.zoom*100)+'%';
       imgEl.style.objectPosition = _imgObjPos(post);
+      imgEl.style.transformOrigin = 'center center';
+      imgEl.style.transform = post.imgPos.zoom > 1 ? ('scale(' + post.imgPos.zoom + ')') : '';
     }, { passive: false });
   }
 }
@@ -2700,7 +2703,11 @@ function emSetZoom(v){
   var zl = document.getElementById('emZoomLabel'); if (zl) zl.textContent = Math.round(post.imgPos.zoom*100)+'%';
   var card = document.getElementById('emPreviewCard');
   var imgEl = card ? card.querySelector('img') : null;
-  if (imgEl) imgEl.style.objectPosition = _imgObjPos(post);
+  if (imgEl) {
+    imgEl.style.objectPosition = _imgObjPos(post);
+    imgEl.style.transformOrigin = 'center center';
+    imgEl.style.transform = post.imgPos.zoom > 1 ? ('scale(' + post.imgPos.zoom + ')') : '';
+  }
 }
 
 function emSyncFromForm() {
