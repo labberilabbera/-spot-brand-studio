@@ -688,6 +688,7 @@ textarea.field-input{resize:none;line-height:1.5}
       <div style="display:flex;gap:8px;border-bottom:1px solid #e5e7eb">
         <button id="pubTabActive" class="pub-tab active" onclick="setPubTab('active')">📂 Aktiva <span id="pubTabActiveCount" class="pub-tab-count">0</span></button>
         <button id="pubTabArchive" class="pub-tab" onclick="setPubTab('archive')">🗄️ Arkiv <span id="pubTabArchiveCount" class="pub-tab-count">0</span></button>
+        <button id="pubTabTrash" class="pub-tab" onclick="setPubTab('trash')">🗑️ Papperskorg <span id="pubTabTrashCount" class="pub-tab-count">0</span></button>
       </div>
       <div id="pubViewGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px"></div>
       <div id="pubViewEmpty" style="display:none;text-align:center;padding:60px 20px;color:#9ca3af;font-size:14px">
@@ -1100,10 +1101,56 @@ function expiryInfo(post) {
   const txt = daysLeft <= 1 ? 'Ute <1 dag kvar' : `Ute ${daysLeft} dagar kvar`;
   return { cls: daysLeft <= 2 ? 'soon' : 'live', label: `⏳ ${txt}` };
 }
+function renderTrash(){
+  const grid = document.getElementById('pubViewGrid');
+  const empty = document.getElementById('pubEmpty');
+  if (!grid) return;
+  fetch('/api/trash-posts').then(function(r){return r.json();}).then(function(data){
+    var posts = data.posts || [];
+    window._trashCache = posts;
+    var cnt = document.getElementById('pubTabTrashCount'); if (cnt) cnt.textContent = posts.length;
+    if (!posts.length) {
+      grid.innerHTML = '';
+      if (empty) { empty.style.display = 'block'; empty.textContent = 'Papperskorgen är tom. Inlägg du tar bort hamnar här och kan återställas.'; }
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+    grid.innerHTML = posts.map(function(post, i){
+      var when = post.deletedAt ? new Date(Number(post.deletedAt)).toLocaleDateString('sv-SE') : '';
+      return '<div class="pub-card" style="opacity:.75">' +
+        '<div style="aspect-ratio:' + (typeof _arFor==='function'? _arFor(post.channel) : '4/5') + ';overflow:hidden;position:relative">' + getPostImageHTML(post) + '</div>' +
+        '<div style="padding:10px 12px">' +
+        '<div style="font-size:13px;font-weight:600;color:#111">' + (post.title||'(Utan titel)') + '</div>' +
+        '<div style="font-size:11px;color:#9ca3af;margin-top:3px">' + (typeof _authorLine==='function'? _authorLine(post) : '') + '</div>' +
+        (when ? ('<div style="font-size:11px;color:#b31e59;margin-top:3px">🗑️ Borttagen ' + when + '</div>') : '') +
+        '<div style="display:flex;gap:6px;margin-top:8px">' +
+        '<button onclick="restoreTrashPost(' + i + ')" style="font-size:10px;font-weight:600;border:1px solid #e5e7eb;background:#fff;color:#374151;border-radius:6px;padding:3px 9px;cursor:pointer">↩️ Återställ</button>' +
+        '<button onclick="purgeTrashPost(' + i + ')" style="font-size:10px;font-weight:600;border:1px solid #fecaca;background:#fff;color:#b31e59;border-radius:6px;padding:3px 9px;cursor:pointer">✕ Radera permanent</button>' +
+        '</div></div></div>';
+    }).join('');
+  }).catch(function(){});
+}
+function restoreTrashPost(i){
+  var post = (window._trashCache||[])[i];
+  if (!post) return;
+  fetch('/api/restore-post', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id: post.id}) })
+    .then(function(){ if (typeof showToast==='function') showToast('↩️ Inlägget återställt'); renderTrash(); })
+    .catch(function(){});
+}
+function purgeTrashPost(i){
+  var post = (window._trashCache||[])[i];
+  if (!post) return;
+  if (!confirm('Radera "' + (post.title||'inlägget') + '" permanent? Detta går INTE att ångra.')) return;
+  fetch('/api/purge-post', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id: post.id}) })
+    .then(function(){ if (typeof showToast==='function') showToast('🗑️ Permanent raderat'); renderTrash(); })
+    .catch(function(){});
+}
 function setPubTab(tab) {
   S.pubTab = tab;
   document.getElementById('pubTabActive')?.classList.toggle('active', tab === 'active');
   document.getElementById('pubTabArchive')?.classList.toggle('active', tab === 'archive');
+  document.getElementById('pubTabTrash')?.classList.toggle('active', tab === 'trash');
+  if (tab === 'trash') { renderTrash(); return; }
   renderPublished();
 }
 // Arkivera / återställ manuellt – sätter en beständig override per inlägg
@@ -3478,7 +3525,7 @@ async function renderPublished() {
 function deletePublishedPost(idx){
   const post = (window._pubPostsCache && window._pubPostsCache[idx]) || null;
   if (!post) return;
-  if (!confirm('Ta bort "' + (post.title||'inlägget') + '" permanent? Detta går inte att ångra.')) return;
+  if (!confirm('Flytta "' + (post.title||'inlägget') + '" till papperskorgen? Du kan återställa det därifrån.')) return;
   const finish = function(){
     S.publishedPosts = S.publishedPosts.filter(function(p){ return !(p.title===post.title && p.channel===post.channel); });
     S.reviewQueue = S.reviewQueue.filter(function(p){ return p.id !== post.id; });
