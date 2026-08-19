@@ -4000,21 +4000,23 @@ function repostScheduled(id){
   _repostFromPost(p);
 }
 function _repostFromPost(p){
-  navigate('create');
-  setTimeout(function(){
-    if (typeof setMode === 'function') setMode('manual');
-    var t = document.getElementById('m-title'); if (t) t.value = p.title || '';
-    var c = document.getElementById('m-content'); if (c) c.value = p.content || '';
-    S.manualTags = (p.hashtags||[]).map(function(x){ return String(x).replace(/^#/,''); });
-    if (typeof renderManualTags === 'function') renderManualTags();
-    var ch = p.channel || 'linkedin';
-    S.manualChannels = [ch]; S.manualChannel = ch;
-    document.querySelectorAll('#manualChGrid .ch-pill').forEach(function(el){ el.classList.toggle('active', el.dataset.ch === ch); });
-    var img = p.imageUrl || p.aiImageUrl || null;
-    if (img) { S._uploadedImageUrl = img; S._imgPos = p.imgPos || { x:0, y:0, zoom:1 }; }
-    if (typeof updateManualPreview === 'function') updateManualPreview();
-    if (typeof showToast === 'function') showToast('🔁 Kopierat till Skapa inlägg — redigera och publicera');
-  }, 120);
+  // Repost publishes straight to the user's own connected channel (LinkedIn)
+  if (!_liConnected) {
+    if (typeof showToast === 'function') showToast('⚠️ Anslut LinkedIn först (profilmenyn uppe till höger)');
+    return;
+  }
+  var tags = (p.hashtags||[]).map(function(t){ return '#' + String(t).replace(/^#/,''); }).join(' ');
+  var fullText = (p.title||'') + '\n\n' + (p.content||'') + (tags ? ('\n\n' + tags) : '');
+  if (!confirm('Reposta "' + (p.title||'inlägget') + '" till din LinkedIn nu?')) return;
+  if (typeof showToast === 'function') showToast('📤 Repostar till LinkedIn…');
+  var imgUrl = p.imageUrl || p.aiImageUrl || null;
+  fetch('/api/linkedin/publish', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: fullText, imageDataUrl: imgUrl }) })
+    .then(function(r){ return r.json().then(function(dd){ return {ok:r.ok, data:dd}; }); })
+    .then(function(res){
+      if (res.ok) { if (typeof showToast === 'function') showToast('✅ Repostat på din LinkedIn!'); }
+      else { if (typeof showToast === 'function') showToast('⚠️ ' + (res.data.error || 'Kunde inte reposta')); }
+    })
+    .catch(function(){ if (typeof showToast === 'function') showToast('⚠️ Kunde inte reposta'); });
 }
 function downloadAdvocacyPost(idx, posts){
   const p = (posts||[])[idx];
