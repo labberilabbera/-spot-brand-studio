@@ -2693,16 +2693,18 @@ function emRenderPreview() {
   const h1 = _findLeaf(_imgT);
   const p  = _findLeaf(_imgC);
   const tagsEl = _findLeaf(_tagStr);
-  const widgets = [ ['title', h1], ['content', p], ['hashtags', tagsEl] ];
+  var brandEl = _findLeaf((typeof BRAND_NAME !== 'undefined' && BRAND_NAME) ? BRAND_NAME : 'spot.') || card.querySelector('[class*="logo"],[class*="brand"]');
+  const widgets = [ ['brand', brandEl], ['title', h1], ['content', p], ['hashtags', tagsEl] ];
   widgets.forEach(function(pair){
     var key = pair[0], node = pair[1];
-    if (!node || !(post.blocks||[]).includes(key)) return;
+    if (!node) return;
+    if (key !== 'brand' && !(post.blocks||[]).includes(key)) return;
     var pos = post.textPos[key] || { x:0, y:0 };
     var scale = post.textScale[key] || 1;
     node.style.position = 'relative';
-    node.style.transform = 'translate(' + pos.x + 'px,' + pos.y + 'px)';
+    node.style.transform = 'translate(' + pos.x + 'px,' + pos.y + 'px)' + ((key === 'brand' && scale !== 1) ? (' scale(' + scale + ')') : '');
     node.style.transformOrigin = 'left top';
-    node.style.fontSize = (scale === 1) ? '' : (scale * 100) + '%';
+    if (key !== 'brand') node.style.fontSize = (scale === 1) ? '' : (scale * 100) + '%';
     node.style.outlineOffset = '3px';
     node.style.cursor = 'move';
     if (key !== 'hashtags') {
@@ -2732,7 +2734,8 @@ function emRenderPreview() {
       if (!moved) return;
       ev.preventDefault();
       post.textPos[key] = { x: startX + dx, y: startY + dy };
-      node.style.transform = 'translate(' + (startX+dx) + 'px,' + (startY+dy) + 'px)';
+      var _sc = (post.textScale && post.textScale[key]) || 1;
+      node.style.transform = 'translate(' + (startX+dx) + 'px,' + (startY+dy) + 'px)' + ((key === 'brand' && _sc !== 1) ? (' scale(' + _sc + ')') : '');
     });
     window.addEventListener('mouseup', function(){
       if (!dragging) return;
@@ -2746,6 +2749,7 @@ function emRenderPreview() {
     x.title = 'Ta bort';
     x.contentEditable = 'false';
     x.style.cssText = 'position:absolute;top:-10px;right:-10px;width:20px;height:20px;border-radius:50%;background:#b31e59;color:#fff;border:2px solid #fff;font-size:11px;line-height:1;cursor:pointer;z-index:30;padding:0;display:none;align-items:center;justify-content:center';
+    if (key === 'brand') x.remove();
     x.addEventListener('mousedown', function(ev){ ev.preventDefault(); ev.stopPropagation(); });
     x.addEventListener('click', function(ev){ ev.preventDefault(); ev.stopPropagation(); if (typeof emRemoveBlock==='function') emRemoveBlock(key); });
     node.appendChild(x);
@@ -2811,7 +2815,7 @@ function emSelectWidget(key){
   var panel = document.getElementById('emWidgetPanel');
   if (panel) panel.style.display = key ? 'block' : 'none';
   var lbl = document.getElementById('emWidgetLabel');
-  var names = { title:'Rubrik', content:'Text', hashtags:'Hashtags' };
+  var names = { brand:'Logotyp', title:'Rubrik', content:'Text', hashtags:'Hashtags' };
   if (lbl && key) lbl.textContent = names[key] || key;
   var post = S._editPost;
   var sl = document.getElementById('emTextSize');
@@ -3096,6 +3100,16 @@ function saveEditorModal() {
     showToast('✅ Ändringar sparade');
   }
 }
+function _currentCreateLayout(){
+  try {
+    var ch = S.manualChannel || (S.manualChannels && S.manualChannels[0]) || 'linkedin';
+    var props = (window._allChannelProposals || {})[ch];
+    var selIdx = (window._selectedProposalPerChannel || {})[ch];
+    if (props && selIdx !== undefined && props[selIdx] && props[selIdx].layout) return props[selIdx].layout;
+    if (S.manualLayout) return S.manualLayout;
+  } catch(e) {}
+  return 'gradient';
+}
 function openCreateEditor() {
   const t  = document.getElementById('m-title');
   const c  = document.getElementById('m-content');
@@ -3109,6 +3123,7 @@ function openCreateEditor() {
     cta: ca ? ca.value : '',
     imageUrl: (typeof activeImageUrl === 'function') ? activeImageUrl() : null,
     imgPos: S._imgPos || null,
+    layout: _currentCreateLayout(),
   };
   S._editIsCreateMode = true;
   openEditorModal(tempPost);
