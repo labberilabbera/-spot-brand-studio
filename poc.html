@@ -3922,7 +3922,8 @@ function renderAdvocacy() {
   const posts = [
     ...S.reviewQueue.filter(p => p.status === 'approved' || p.status === 'published'),
     ...(S.publishedPosts || []),
-    ...(window._pubPostsCache || [])
+    ...(window._pubPostsCache || []),
+    ...(TEAM_POSTS || [])
   ];
   // Deduplicate by title
   const seen = new Set();
@@ -3959,7 +3960,7 @@ function renderAdvocacy() {
         <div class="adv-post-title">${p.title||'(Utan titel)'}</div>
         <div class="adv-post-content">${p.content||''}</div>
         <div style="font-size:11px;color:#9ca3af;margin:3px 0 6px">${_authorLine(p)}</div>
-        <button class="adv-share-btn" onclick='quickShareAdvocacy(${i}, window._advPosts)'>🔗 Dela på min profil</button><button class="adv-share-btn" style="background:#374151" onclick='downloadAdvocacyPost(${i}, window._advPosts)'>⬇️ Ladda ner inlägg</button>
+        <button class="adv-share-btn" onclick='quickShareAdvocacy(${i}, window._advPosts)'>🔗 Dela på min profil</button><button class="adv-share-btn" style="background:#fff;border:1.5px solid var(--m);color:var(--m);margin-left:6px" onclick='repostPost(${i}, window._advPosts)'>🔁 Reposta</button><button class="adv-share-btn" style="background:#374151" onclick='downloadAdvocacyPost(${i}, window._advPosts)'>⬇️ Ladda ner inlägg</button>
       </div>
     </div>`;
   }).join('');
@@ -3986,6 +3987,34 @@ function advZoomPost(idx){
   S._lbSingle = { channel: p.channel, layout:(p.layout||'gradient'), title:p.title||'', content:p.content||'', hashtags:(p.hashtags||[]), cta:p.cta||'', author:'', imageUrl:(p.imageUrl||p.aiImageUrl||null), aiImageUrl:(p.aiImageUrl||null), imgPos:(p.imgPos||null) };
   renderLightbox();
   document.getElementById('lightbox').classList.add('open');
+}
+function repostPost(idx, posts){
+  const p = (posts||[])[idx];
+  if (!p) return;
+  _repostFromPost(p);
+}
+function repostScheduled(id){
+  const all = (typeof getScheduledPosts === 'function') ? getScheduledPosts() : [];
+  const p = all.find(function(x){ return String(x.id) === String(id); });
+  if (!p) return;
+  _repostFromPost(p);
+}
+function _repostFromPost(p){
+  navigate('create');
+  setTimeout(function(){
+    if (typeof setMode === 'function') setMode('manual');
+    var t = document.getElementById('m-title'); if (t) t.value = p.title || '';
+    var c = document.getElementById('m-content'); if (c) c.value = p.content || '';
+    S.manualTags = (p.hashtags||[]).map(function(x){ return String(x).replace(/^#/,''); });
+    if (typeof renderManualTags === 'function') renderManualTags();
+    var ch = p.channel || 'linkedin';
+    S.manualChannels = [ch]; S.manualChannel = ch;
+    document.querySelectorAll('#manualChGrid .ch-pill').forEach(function(el){ el.classList.toggle('active', el.dataset.ch === ch); });
+    var img = p.imageUrl || p.aiImageUrl || null;
+    if (img) { S._uploadedImageUrl = img; S._imgPos = p.imgPos || { x:0, y:0, zoom:1 }; }
+    if (typeof updateManualPreview === 'function') updateManualPreview();
+    if (typeof showToast === 'function') showToast('🔁 Kopierat till Skapa inlägg — redigera och publicera');
+  }, 120);
 }
 function downloadAdvocacyPost(idx, posts){
   const p = (posts||[])[idx];
@@ -4331,7 +4360,7 @@ function renderSchema() {
         <div class="upcoming-content">${p.content||''}</div>
         <div style="font-size:11px;color:#9ca3af;margin-top:3px">${_authorLine(p)}</div>
       </div>
-      <button onclick="event.stopPropagation();deleteScheduledPost('${p.id}')" title="Ta bort" style="font-size:11px;font-weight:600;border:1px solid #fecaca;background:#fff;color:#b31e59;border-radius:6px;padding:3px 9px;cursor:pointer;flex-shrink:0">🗑️</button>
+      <button onclick="event.stopPropagation();repostScheduled('${p.id}')" title="Reposta" style="font-size:11px;font-weight:600;border:1px solid #e5e7eb;background:#fff;color:var(--m);border-radius:6px;padding:3px 9px;cursor:pointer;flex-shrink:0;margin-right:6px">🔁</button><button onclick="event.stopPropagation();deleteScheduledPost('${p.id}')" title="Ta bort" style="font-size:11px;font-weight:600;border:1px solid #fecaca;background:#fff;color:#b31e59;border-radius:6px;padding:3px 9px;cursor:pointer;flex-shrink:0">🗑️</button>
     </div>`;
   }).join('');
 }
