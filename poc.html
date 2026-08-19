@@ -989,13 +989,43 @@ function openLibraryPicker(target){
   var grid = document.getElementById('libPickerGrid');
   if (!modal || !grid) return;
   var lib = _getImgLib();
-  if (!lib.length) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;font-size:13px;color:#9ca3af">Inga bilder i biblioteket ännu.<br>Ladda upp bilder under Varumärke → Bildbibliotek.</div>'; }
+  var addTile = '<label style="cursor:pointer;aspect-ratio:1;border-radius:8px;border:2px dashed #d9d9d9;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#9ca3af;transition:border-color .15s,color .15s" onmouseover="this.style.borderColor=\'var(--m)\';this.style.color=\'var(--m)\'" onmouseout="this.style.borderColor=\'#d9d9d9\';this.style.color=\'#9ca3af\'"><div style="font-size:26px;line-height:1">+</div><div style="font-size:11px;margin-top:4px">Lägg till</div><input type="file" accept="image/*" multiple style="display:none" onchange="addToLibraryFromPicker(this)"></label>';
+  if (!lib.length) { grid.innerHTML = addTile + '<div style="grid-column:1/-1;text-align:center;padding:14px;font-size:12px;color:#9ca3af">Inga bilder i biblioteket ännu — tryck + för att lägga till.</div>'; }
   else {
     grid.innerHTML = lib.map(function(img, i){
       return '<div onclick="selectFromLibrary(' + i + ')" style="cursor:pointer;aspect-ratio:1;border-radius:8px;overflow:hidden;border:2px solid #e5e7eb;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--m)\'" onmouseout="this.style.borderColor=\'#e5e7eb\'"><img src="' + img.url + '" style="width:100%;height:100%;object-fit:cover"/></div>';
-    }).join('');
+    }).join('') + addTile;
   }
   modal.style.display = 'flex';
+}
+function addToLibraryFromPicker(input){
+  var files = Array.prototype.slice.call(input.files || []);
+  if (!files.length) return;
+  var MAX = 5*1024*1024;
+  var tooBig = files.filter(function(f){ return f.size > MAX; });
+  files = files.filter(function(f){ return f.size <= MAX; });
+  if (tooBig.length && typeof showToast==='function') showToast('⚠️ ' + tooBig.length + ' bild(er) för stora (max 5 MB)');
+  if (!files.length) { input.value=''; return; }
+  var remaining = files.length, ok = 0;
+  files.forEach(function(file){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      fetch('/api/brand-images', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name:file.name, url:e.target.result }) })
+        .then(function(r){ return r.json(); })
+        .then(function(res){
+          if (res.ok) { _imgLibCache.unshift({ id:res.id, name:file.name, url:e.target.result, ts:res.ts }); ok++; }
+          remaining--;
+          if (remaining === 0) {
+            if (ok && typeof showToast==='function') showToast('📤 ' + ok + ' bild(er) tillagda i biblioteket');
+            openLibraryPicker(window._libPickTarget);
+            if (typeof renderImgLibrary==='function') renderImgLibrary();
+          }
+        })
+        .catch(function(){ remaining--; if (remaining===0) openLibraryPicker(window._libPickTarget); });
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value = '';
 }
 function closeLibraryPicker(){ var m=document.getElementById('libPickerModal'); if(m)m.style.display='none'; }
 function selectFromLibrary(i){
