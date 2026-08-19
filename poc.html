@@ -3100,12 +3100,14 @@ function saveEditorModal() {
     showToast('✅ Ändringar sparade');
   }
 }
+var CARD_LAYOUTS = ['studio','case','louisiana'];
 function _currentCreateLayout(){
   try {
     var ch = S.manualChannel || (S.manualChannels && S.manualChannels[0]) || 'linkedin';
-    var props = (window._allChannelProposals || {})[ch];
     var selIdx = (window._selectedProposalPerChannel || {})[ch];
-    if (props && selIdx !== undefined && props[selIdx] && props[selIdx].layout) return props[selIdx].layout;
+    if (selIdx === undefined || selIdx === null) selIdx = 0;
+    var props = (window._allChannelProposals || {})[ch];
+    if (props && props.length) return CARD_LAYOUTS[selIdx] || 'gradient';
     if (S.manualLayout) return S.manualLayout;
   } catch(e) {}
   return 'gradient';
