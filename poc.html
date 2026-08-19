@@ -983,7 +983,8 @@ _loadUserInfo();
 var _imgLibCache = [];
 function _getImgLib(){ return _imgLibCache; }
 function _loadImgLibrary(){ fetch('/api/brand-images').then(function(r){return r.json();}).then(function(data){ _imgLibCache = data.images || []; renderImgLibrary(); }).catch(function(){}); }
-function openLibraryPicker(){
+function openLibraryPicker(target){
+  window._libPickTarget = target || 'create';
   var modal = document.getElementById('libPickerModal');
   var grid = document.getElementById('libPickerGrid');
   if (!modal || !grid) return;
@@ -1001,6 +1002,19 @@ function selectFromLibrary(i){
   var lib = _getImgLib();
   var img = lib[i];
   if (!img) return;
+  if (window._libPickTarget === 'editor') {
+    var post = S._editPost;
+    if (post) {
+      post.imageUrl = img.url;
+      post.aiImageUrl = img.url;
+      post.imgPos = { x:0, y:0, zoom:1 };
+      closeLibraryPicker();
+      emRenderPreview();
+      if (typeof showToast === 'function') showToast('📚 Bild vald från biblioteket');
+    }
+    window._libPickTarget = 'create';
+    return;
+  }
   S._uploadedImageUrl = img.url;
   S._imgPos = { x: 0, y: 0, zoom: 1 };
   var preview = document.getElementById('imgPreview');
@@ -2576,6 +2590,10 @@ function openEditorModal(post) {
         <span id="emZoomLabel" style="font-size:11px;color:#6b7280;min-width:38px;text-align:right">${Math.round((((post.imgPos&&post.imgPos.zoom)||1))*100)}%</span>
       </div>
       <div style="font-size:11px;color:#9ca3af;margin-bottom:8px">Dra i bilden för att flytta motivet · scrolla för att zooma</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <button onclick="openLibraryPicker('editor')" style="flex:1 1 auto;min-width:120px;font-size:12px;color:#374151;border:1.5px solid #e5e7eb;border-radius:8px;padding:8px 10px;background:#fff;cursor:pointer">📚 Från bibliotek</button>
+        <label style="flex:1 1 auto;min-width:120px;font-size:12px;color:#374151;border:1.5px solid #e5e7eb;border-radius:8px;padding:8px 10px;background:#fff;cursor:pointer;text-align:center">📤 Ladda upp<input type="file" accept="image/*" style="display:none" onchange="emUploadImage(this)"></label>
+      </div>
       <div style="display:flex;gap:6px;margin-bottom:6px">
         <input id="em-img-reprompt" class="em-input" style="flex:1" placeholder="Beskriv en ändring av bilden...">
         <button onclick="emRepromptImage()" style="padding:8px 12px;background:var(--m);color:#fff;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;border:none;white-space:nowrap">Ny bild</button>
@@ -2912,6 +2930,26 @@ function emUndoText(){
   if (!S._editTextUndoStack.length) { const tb = document.getElementById('emTextUndoBtn'); if (tb) tb.style.display = 'none'; }
   emRenderPreview();
   if (typeof showToast==='function') showToast('↶ Text återställd');
+}
+function emUploadImage(input){
+  var file = (input.files||[])[0];
+  if (!file) return;
+  if (file.size > 5*1024*1024) { if (typeof showToast==='function') showToast('⚠️ Bilden är för stor (max 5 MB)'); input.value=''; return; }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var post = S._editPost;
+    if (!post) return;
+    S._editImgUndoStack = S._editImgUndoStack || [];
+    S._editImgUndoStack.push(post.imageUrl || post.aiImageUrl || null);
+    post.imageUrl = e.target.result;
+    post.aiImageUrl = e.target.result;
+    post.imgPos = { x:0, y:0, zoom:1 };
+    var ub = document.getElementById('emImgUndoBtn'); if (ub) ub.style.display = 'inline-flex';
+    emRenderPreview();
+    if (typeof showToast==='function') showToast('📤 Bild uppladdad');
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
 }
 function emUndoImage(){
   const post = S._editPost;
